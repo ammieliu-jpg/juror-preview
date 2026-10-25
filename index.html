@@ -46,7 +46,7 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .screen canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 .place{position:absolute;left:8px;top:8px;background:rgba(14,16,36,.82);color:var(--paper);font-size:12px;padding:2px 8px;border-left:3px solid var(--brass)}
 .caption{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(14,16,36,.86);font-size:13px;padding:4px 10px;text-align:center}
-.dialog{position:relative;background:var(--paper);color:var(--paper-ink);border:4px solid #0e1024;box-shadow:inset 0 0 0 2px #c9b994;padding:14px 16px 16px;min-height:150px;cursor:pointer}
+.dialog{-webkit-user-select:none;user-select:none;position:relative;background:var(--paper);color:var(--paper-ink);border:4px solid #0e1024;box-shadow:inset 0 0 0 2px #c9b994;padding:14px 16px 16px;min-height:150px;cursor:pointer}
 .speaker{display:inline-block;background:var(--paper-ink);color:var(--paper);font-weight:700;font-size:13px;padding:1px 10px;margin:-26px 0 6px -4px;border:2px solid #0e1024}
 .speaker:empty{display:none}
 .text{font-size:16px;line-height:1.75;white-space:pre-line;min-height:56px}
@@ -91,7 +91,7 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .board .v.y{color:var(--ok)} .board .v.n{color:var(--stamp)}
 .tally{font-size:14px}
 .tally .pass{color:var(--ok);font-weight:700}.tally .fail{color:var(--stamp);font-weight:700}
-.hold{font:inherit;font-weight:700;width:100%;padding:14px;border:2px solid var(--paper-ink);background:#fff;position:relative;overflow:hidden;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+.hold{-webkit-touch-callout:none;font:inherit;font-weight:700;width:100%;padding:14px;border:2px solid var(--paper-ink);background:#fff;position:relative;overflow:hidden;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
 .hold span{position:relative}
 .hold i{position:absolute;inset:0 auto 0 0;width:0;background:var(--brass)}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
@@ -579,11 +579,11 @@ function surveyModal(){
 function oathModal(){
   return modal(`<h3>宣誓</h3><div class="sub">國民法官在審理前要宣誓，承諾依法公正誠實地執行職務</div>
     <p style="font-size:14px">宣誓是國民法官的 8 項義務之一，其他還有嚴守秘密、全程到庭、公正獨立、參與評議等。（Q3634）</p>
-    <button class="hold" id="hold"><i></i><span>按住 2 秒宣誓</span></button>`, (doc,close)=>{
+    <p class="field" style="text-align:center">請<b>按住下面的按鈕不要放開</b>，直到黃色進度條填滿</p><button class="hold" id="hold"><i></i><span>🖐 按住這裡 2 秒宣誓</span></button><p class="warn" id="holdTip" hidden style="text-align:center">要一直按住喔，進度條滿了才會完成。</p>`, (doc,close)=>{
       const b=doc.querySelector('#hold'), bar=b.querySelector('i'); let t0=0, raf;
       const tick=()=>{const p=Math.min(1,(performance.now()-t0)/2000);bar.style.width=p*100+'%';if(p>=1){b.querySelector('span').textContent='宣誓完成';SFX.chime([523,659,784,1047]);setTimeout(()=>close(),400);return}raf=requestAnimationFrame(tick)};
       const down=e=>{e.preventDefault();t0=performance.now();raf=requestAnimationFrame(tick)};
-      const up=()=>{cancelAnimationFrame(raf);if(bar.style.width!=='100%')bar.style.width='0'};
+      const up=()=>{cancelAnimationFrame(raf);if(bar.style.width!=='100%'){bar.style.width='0';if(t0&&performance.now()-t0<1500){doc.querySelector('#holdTip').hidden=false;b.animate?.([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'none'}],{duration:240});}}t0=0};
       b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointerleave',up);
       b.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat)down(e)}); b.addEventListener('keyup',up);
   });
