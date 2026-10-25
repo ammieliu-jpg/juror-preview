@@ -341,9 +341,9 @@ const SFX=(()=>{
   function filt(type,f,q=1){ const b=ctx.createBiquadFilter(); b.type=type; b.frequency.value=f; b.Q.value=q; return b; }
   let wantRain=false, wantEng=null;
   function rainOn(){ wantRain=true; if(!ctx||rain) return;
-    const s=src(), hp=filt('highpass',900), lp=filt('lowpass',6000), g=ctx.createGain(); g.gain.value=0;
-    g.gain.linearRampToValueAtTime(.22,now()+1.2); s.connect(hp).connect(lp).connect(g).connect(master); s.start();
-    const drops=setInterval(()=>{ if(!ctx) return; const o=ctx.createOscillator(); o.frequency.value=2500+Math.random()*2500; env(o,.015,.002,.04); o.start(); o.stop(now()+.06); },90);
+    const s=src(), hp=filt('highpass',1000), lp=filt('lowpass',4000), g=ctx.createGain(); g.gain.value=0;
+    g.gain.linearRampToValueAtTime(.07,now()+1.2); s.connect(hp).connect(lp).connect(g).connect(master); s.start();
+    const drops=setInterval(()=>{ if(!ctx) return; const o=ctx.createOscillator(); o.frequency.value=2500+Math.random()*2500; env(o,.006,.002,.04); o.start(); o.stop(now()+.06); },90);
     rain={s,g,drops}; }
   function rainOff(){ wantRain=false; if(!rain) return; const r=rain; rain=null; clearInterval(r.drops);
     r.g.gain.cancelScheduledValues(now()); r.g.gain.setValueAtTime(r.g.gain.value,now()); r.g.gain.linearRampToValueAtTime(0,now()+.8); r.s.stop(now()+.9); }
