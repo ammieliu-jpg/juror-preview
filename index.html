@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="國民法官互動預演：從收到通知、選任、審理到評議，右下角手機可隨時查詢常見問答。非官方競賽原型。">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>這次換你判</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Silkscreen&display=swap">
+<style>
+/* Layout: one column game console. Pixel stage on top, dialogue box below, phone fixed bottom-right. Single dark look on purpose. */
+:root{
+  --ink:#1b1f3a;      /* night navy, page ground */
+  --ink2:#262b4d;     /* raised panels */
+  --paper:#f2e8d2;    /* dialogue paper */
+  --paper-ink:#2a2233;
+  --brass:#e2a83c;    /* gavel brass accent */
+  --robe-blue:#3d6fd1;/* 法官袍藍邊 */
+  --stamp:#c8463d;    /* seal red */
+  --mute:#9aa0c8;
+  --ok:#5fb27a;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-pix:"Silkscreen","Courier New",monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.app{max-width:760px;margin:0 auto;padding-block:12px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:10px}
+.topbar{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:18px;letter-spacing:.04em;color:var(--brass)}
+.brand small{font-weight:400;color:var(--mute);font-size:12px;margin-left:8px;letter-spacing:0}
+.top-r{display:flex;align-items:center;gap:10px}
+.snd{font:inherit;font-size:12px;background:none;color:var(--paper);border:1px solid var(--mute);padding:1px 8px;cursor:pointer}
+.snd:focus-visible{outline:2px solid var(--brass)}
+.stage{font-family:var(--f-pix);font-size:11px;color:var(--mute);letter-spacing:.08em}
+.stage b{color:var(--paper);font-family:var(--f-body);font-size:13px;letter-spacing:0;margin-left:6px}
+.progress{display:flex;gap:4px}
+.progress i{flex:1;height:4px;background:var(--ink2);border-radius:1px}
+.progress i.on{background:var(--brass)}
+.screen{position:relative;border:4px solid #0e1024;box-shadow:0 0 0 2px var(--ink2);background:#000;aspect-ratio:16/9;max-width:100%;overflow:hidden}
+.screen canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.place{position:absolute;left:8px;top:8px;background:rgba(14,16,36,.82);color:var(--paper);font-size:12px;padding:2px 8px;border-left:3px solid var(--brass)}
+.caption{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(14,16,36,.86);font-size:13px;padding:4px 10px;text-align:center}
+.dialog{position:relative;background:var(--paper);color:var(--paper-ink);border:4px solid #0e1024;box-shadow:inset 0 0 0 2px #c9b994;padding:14px 16px 16px;min-height:150px;cursor:pointer}
+.speaker{display:inline-block;background:var(--paper-ink);color:var(--paper);font-weight:700;font-size:13px;padding:1px 10px;margin:-26px 0 6px -4px;border:2px solid #0e1024}
+.speaker:empty{display:none}
+.text{font-size:16px;line-height:1.75;white-space:pre-line;min-height:56px}
+.text .cite{font-size:12px;color:#7a6a55;white-space:nowrap}
+.next{position:absolute;right:10px;bottom:4px;background:none;border:0;color:var(--stamp);font-size:16px;cursor:pointer;animation:bob 1s steps(2) infinite}
+@keyframes bob{50%{transform:translateY(3px)}}
+.choices{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.choice{font:inherit;font-size:15px;text-align:left;background:#fffaf0;color:var(--paper-ink);border:2px solid var(--paper-ink);box-shadow:3px 3px 0 var(--paper-ink);padding:8px 12px;cursor:pointer}
+.choice:hover,.choice:focus-visible{background:var(--brass);outline:none}
+.choice.ai{border-style:dashed}
+.note{font-size:12px;color:var(--mute);line-height:1.5}
+/* modal documents */
+.modal{position:fixed;inset:0;background:rgba(8,9,20,.78);display:flex;align-items:center;justify-content:center;z-index:30;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.doc{background:#fbf6ea;color:var(--paper-ink);max-width:520px;width:100%;max-height:100%;overflow:auto;padding:20px 22px;border:2px solid var(--paper-ink);box-shadow:6px 6px 0 #0e1024;position:relative}
+.doc h3{margin:0 0 4px;font-size:18px;text-align:center;letter-spacing:.1em;text-wrap:balance}
+.doc .sub{text-align:center;font-size:12px;color:#7a6a55;margin-bottom:12px}
+.doc dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0 0 12px;font-size:14px}
+.doc dt{color:#7a6a55}
+.doc dd{margin:0}
+.doc .seal{position:absolute;right:18px;top:54px;width:58px;height:58px;border:3px solid var(--stamp);color:var(--stamp);font-size:12px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;transform:rotate(-8deg);opacity:.85}
+.doc .btn{font:inherit;font-weight:700;background:var(--paper-ink);color:var(--paper);border:0;padding:8px 16px;cursor:pointer;margin-top:6px}
+.doc .btn:focus-visible{outline:3px solid var(--brass)}
+.doc .fine{font-size:12px;color:#7a6a55}
+.doc label{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:14px;cursor:pointer}
+.doc .result{background:#efe4c8;padding:8px 10px;margin:10px 0;font-size:14px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.card{border:2px solid var(--paper-ink);padding:10px;background:#fff;font-size:13px}
+.card b{display:block;font-size:15px;margin-bottom:2px}
+.card .n{font-family:var(--f-pix);font-size:10px;color:var(--robe-blue)}
+.board{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin:10px 0;text-align:center;font-size:11px}
+.board .seat{border:2px solid var(--paper-ink);padding:4px 0;background:#fff}
+.board .seat.j{background:#e3ebfb}
+.board .seat.me{outline:3px solid var(--brass)}
+.board .v{font-size:18px;font-weight:700;line-height:1.3}
+.board .v.y{color:var(--ok)} .board .v.n{color:var(--stamp)}
+.tally{font-size:14px}
+.tally .pass{color:var(--ok);font-weight:700}.tally .fail{color:var(--stamp);font-weight:700}
+.hold{font:inherit;font-weight:700;width:100%;padding:14px;border:2px solid var(--paper-ink);background:#fff;position:relative;overflow:hidden;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+.hold span{position:relative}
+.hold i{position:absolute;inset:0 auto 0 0;width:0;background:var(--brass)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.stat{background:#fff;border:2px solid var(--paper-ink);padding:10px}
+.stat .big{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .big s{color:#9a8b74;font-size:15px;text-decoration:none;margin-right:6px}
+.stat p{margin:2px 0 0;font-size:12px;color:#7a6a55}
+/* phone */
+.phone-btn{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;width:64px;height:76px;border:0;background:none;padding:0;cursor:pointer}
+.phone-btn svg{width:100%;height:100%;filter:drop-shadow(3px 3px 0 #0e1024)}
+.phone-btn .badge{position:absolute;top:-4px;right:-2px;background:var(--stamp);color:#fff;font-family:var(--f-pix);font-size:12px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:2px solid #0e1024}
+.phone-btn:focus-visible{outline:3px solid var(--brass)}
+.phone{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(100px + env(safe-area-inset-bottom,0px));z-index:25;width:min(360px,calc(100vw - 32px));height:min(560px,calc(100% - 130px));background:#14172e;border:6px solid #0e1024;box-shadow:0 0 0 2px var(--mute),6px 6px 0 #0e1024;display:flex;flex-direction:column}
+.phone header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--ink2);gap:8px}
+.phone header b{font-size:14px}
+.phone header .mode{font-size:11px;color:var(--mute);display:block;font-weight:400}
+.phone .x{background:none;border:0;color:var(--paper);font-size:20px;cursor:pointer;line-height:1}
+.msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.msg{max-width:88%;padding:8px 10px;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.msg.me{align-self:flex-end;background:var(--brass);color:#1b1f3a}
+.msg.bot{align-self:flex-start;background:var(--paper);color:var(--paper-ink)}
+.msg.sys{align-self:center;background:none;color:var(--mute);font-size:12px;text-align:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 8px}
+.chip{font:inherit;font-size:12px;background:none;color:var(--paper);border:1px solid var(--mute);padding:3px 8px;cursor:pointer}
+.chip:hover,.chip:focus-visible{border-color:var(--brass);color:var(--brass);outline:none}
+.phone form{display:flex;gap:6px;padding:8px;border-top:2px solid var(--ink2)}
+.phone input{flex:1;min-width:0;font:inherit;font-size:15px;background:var(--ink);color:var(--paper);border:2px solid var(--ink2);padding:6px 8px}
+.phone input:focus{outline:none;border-color:var(--brass)}
+.phone button[type=submit]{font:inherit;font-weight:700;background:var(--brass);color:#1b1f3a;border:0;padding:0 12px;cursor:pointer}
+@media (max-width:480px){.text{font-size:15px}.cards,.stats{grid-template-columns:1fr}.board{font-size:9px}.board .v{font-size:15px}}
+@media (prefers-reduced-motion:reduce){.next{animation:none}}
+</style>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">這次換你判<small>AI 國民法官預演室</small></div>
+    <div class="top-r"><div class="stage" id="stage"></div><button class="snd" id="snd" type="button"></button></div>
+  </div>
+  <div class="progress" id="progress"></div>
+  <div class="screen">
+    <canvas id="cv" width="192" height="108"></canvas>
+    <div class="place" id="place"></div>
+    <div class="caption" id="caption" hidden></div>
+  </div>
+  <div class="dialog" id="dialog" tabindex="0" aria-live="polite">
+    <div class="speaker" id="speaker"></div>
+    <div class="text" id="text"></div>
+    <div class="choices" id="choices"></div>
+    <button class="next" id="next" aria-label="下一句">▼</button>
+  </div>
+  <p class="note">非官方競賽原型，與司法院無關。案情改編自司法院公開之模擬法庭教材（政府資料開放授權條款第 1 版），人名皆為代號；問答內容來自司法院國民法官專區常見問答。點畫面或按空白鍵繼續，右下角手機可以隨時提問。</p>
+</div>
+
+<button class="phone-btn" id="phoneBtn" aria-label="打開 AI 問答手機">
+  <svg viewBox="0 0 16 19" shape-rendering="crispEdges" aria-hidden="true">
+    <rect x="2" y="0" width="12" height="19" fill="#0e1024"/>
+    <rect x="3" y="1" width="10" height="17" fill="#3a4170"/>
+    <rect x="4" y="3" width="8" height="11" fill="#9fd3e8"/>
+    <rect x="5" y="5" width="6" height="2" fill="#f2e8d2"/>
+    <rect x="5" y="8" width="4" height="2" fill="#e2a83c"/>
+    <rect x="6" y="11" width="5" height="2" fill="#f2e8d2"/>
+    <rect x="7" y="15" width="2" height="2" fill="#9aa0c8"/>
+    <rect x="6" y="1" width="4" height="1" fill="#0e1024"/>
+  </svg>
+  <span class="badge" id="badge" hidden>!</span>
+</button>
+
+<div class="phone" id="phone" hidden role="dialog" aria-label="AI 問答">
+  <header>
+    <div><b id="phTitle">國民法官小幫手</b><span class="mode" id="phMode"></span></div>
+    <button class="x" id="phClose" aria-label="關閉">×</button>
+  </header>
+  <div class="msgs" id="msgs"></div>
+  <div class="chips" id="chips"></div>
+  <form id="phForm"><input id="phInput" autocomplete="off" placeholder="輸入你的問題"><button type="submit">送出</button></form>
+</div>
+
+<div class="modal" id="modal" hidden><div class="doc" id="doc"></div></div>
+
+<script>
+const KB = "你是「國民法官 AI 導覽」的問答助理，對象是收到國民法官相關通知的一般民眾。請用親切、白話的繁體中文回答。\n\n【回答規則】\n1. 只能根據下方【資料庫】的內容回答，不可以使用資料庫以外的知識，也不可以自行推測或補充數字、條號。\n2. 每個回答最後都要另起一行，寫「出處：」加上所依據的題目編號，例如「出處：司法院國民法官專區常見問答 Q3637」；若依據的是 A 開頭的題目，就寫該題列出的出處。\n3. 如果資料庫中找不到答案，只回覆：「這個問題目前資料庫沒有收錄，建議直接聯繫通知書上的承辦法院確認。」不要自己編答案。\n4. 先用一兩句話直接回答，再補充細節；整體不超過 150 字。\n5. 不可以提供個案的法律意見，例如「你一定可以拒絕」或「你一定會被罰」。涉及個人狀況時，請說「可能符合」，並提醒最後由法院決定。\n6. 使用者如果表達擔心（麻煩、怕被報復、錢不夠），先簡短回應他的感受，再提供資料庫中的保障或補助資訊。\n\n【免除事由】\n・不得擔任：自身因素：現涉刑案未滿一定期間或被褫奪公權者（Q3606）\n・不得擔任：身心因素：受法院監護或輔助宣告（Q3606）\n・不得擔任：教育門檻：未完成國民教育者（Q3606）\n・不得擔任：案件有關：與本案或本案被告、被害人有一定關係者（Q3606）\n・不得擔任：不能公平：有事證難以公平審判者（Q3606）\n・不得擔任：職業因素：具法、政、軍、警等特殊職業背景者（Q3606）\n・得拒絕：年滿七十歲以上（Q3607）\n・得拒絕：重大受災戶有處理生活重建事務必要（Q3607）\n・得拒絕：具有老師、學生身分（Q3607）\n・得拒絕：曾於5年內擔任過國民法官、備位國民法官（Q3607）\n・得拒絕：因重大疾病、傷害、身心因素而無法執行職務（Q3607）\n・得拒絕：因看護、養育親屬或生活、工作、家庭有重大需要，執行職務顯有困難（Q3607）\n\n【資料庫】\nQ3601（制度介紹）問：什麼是國民法官制度？\n答：國民法官制度是以隨機方式，從一般國民當中抽選出6名國民法官，與3名法官組成國民法官法庭，共同審理特定重大的刑事案件，一起決定被告是否構成犯罪及應該受什麼樣的處罰。 年滿23歲且在地方法院管轄區域內繼續居住滿4個月以上的國民，都有可能被隨機抽選擔任「國民法官」，參與審理「因故意犯罪而發生死亡結果的案件」（自民國112年1月1日起）及「最輕本刑10年以上有期徒刑的案件」（自民國115年1月1日起）。 國民法官在審判中，除聽取檢察官、被告、辯護人提出的證據與主張外，也可直接訊問或詢問證人、鑑定人、被告、被害人，再與法官一起評議，與法官立於對等立場相互討論、充分陳述意見，共同形成論罪科刑的最終決定。國民法官制度的目的，是希望在審判中加入來自各行各業的國民法官多元經驗、想法，與法律專業觀點彼此激盪，讓法院判決視角更加全面，反映全民對公平正義的期待。\n出處：司法院國民法官專區常見問答 Q3601\n\nQ3602（制度介紹）問：為什麼要有國民法官制度？\n答：國民法官制度，就是要讓司法更多元、更透明，讓判決能夠參考一般國民的生活經驗、反映一般國民的正當法律感情，使判決更接地氣；不只加深國民對於司法的理解與信賴，並且讓國民對於犯罪的發生與處理有更深刻的認識與理解，進而對公共議題有更深入的討論，實現公民參與的社會。事實上，世界各國多有採取國民參與刑事審判制度，如美國、英國、法國、德國、日本、韓國等都是。\n出處：司法院國民法官專區常見問答 Q3602\n\nQ3603（制度介紹）問：國民法官會參與哪些案件的審理呢？\n答：自112年1月1日起，因故意犯罪發生死亡結果的案件(如酒醉駕車致死)，就會有國民法官參與審判；115年1月1日起，最輕本刑10年以上有期徒刑之罪（如貪污罪），也納入國民法官參與審判的範圍，但是排除少年刑事案件及違反毒品危害防制條例的案件。\n出處：司法院國民法官專區常見問答 Q3603\n\nQ3604（資格）問：哪些人可以擔任國民法官？\n答：同時符合以下「三種」基本資格就有機會擔任國民法官：\n1. 年滿23歲\n2. 具有中華民國國籍的國民\n3. 在「地方法院管轄區域」連續居住滿4個月以上。（例如：臺灣嘉義地方法院的管轄區域為嘉義市與嘉義縣）\n出處：司法院國民法官專區常見問答 Q3604\n\nQ3605（資格）問：23歲就可以當國民法官，會不會太年輕了？\n答：國民法官除了必須是我國國民外，還需要有相當社會歷練，且身心成熟，足以勝任。參考公職人員選舉罷免法的規定，年滿23歲的國民可以登記為公職人員候選人，所以國民法官的年齡資格也是採用相同的標準。國民法官制度的重點，在於每一位參與的國民都可以提供自己的不同意見，無論是有想法的年輕人或社會經驗豐富的資深國民，都可以說出自己的觀點，為審判做出貢獻。\n出處：司法院國民法官專區常見問答 Q3605\n\nQ3606（資格）問：哪些人不可以擔任國民法官？\n答：如果有以下6種情況之一，就不能擔任國民法官：\n1. 自身因素：現涉刑案未滿一定期間或被褫奪公權者。\n2. 身心因素：因心智狀態不能或較難與他人溝通，而受到法院監護或輔助宣告。\n3. 教育門檻：未完成國民教育者。\n4. 案件有關：與本案或本案被告、被害人有一定關係者。\n5. 不能公平：有事證難以公平審判的人等。\n6. 職業因素：具有法、政、軍、警等特殊職業背景的人等。\n出處：司法院國民法官專區常見問答 Q3606\n\nQ3607（拒絕與免除）問：可以拒絕擔任國民法官嗎？\n答：擔任國民法官參與審判是國民的法定義務，所以如果符合法定的資格，又沒有不能擔任國民法官的事由，如果被抽選成為國民法官的話，原則上不能拒絕擔任國民法官。 但是，如果有以下的情形，可以向法院說明理由，表明拒絕擔任國民法官：\n・年滿七十歲以上。\n・重大受災戶有處理生活重建事務必要。\n・具有老師、學生身分。\n・曾於5年內擔任過國民法官、備位國民法官。\n・因重大疾病、傷害、身心因素而無法執行國民法官職務。\n・因看護、養育親屬或生活、工作、家庭有重大需要，執行國民法官職務顯有困難。 若無正當理由而未於國民法官選任期日到庭，法院得依法處罰新臺幣3萬元以下罰鍰。\n出處：司法院國民法官專區常見問答 Q3607\n\nQ3608（資格）問：沒有法律知識也可以當國民法官嗎？\n答：國民法官制度所倚重的面向，正是法律知識以外的其他多元知識或經驗。在審判過程中，國民法官如果對於審判的程序、基本原則、被告被起訴罪名的構成要件及法令解釋等事項有任何疑惑，都可以依法請求審判長釋疑，向審判長諮詢相關法律知識。\n出處：司法院國民法官專區常見問答 Q3608\n\nQ3609（選任流程）問：國民法官怎麼產生的？\n答：・第一階段-抽選出備選國民法官：前一年9月1日前，地方政府從符合資格者中隨機抽選製作「初選名冊」，由法院審核小組排除不符資格者後製作「複選名冊」並寄送通知。\n・第二階段-抽選候選國民法官：發生適用案件時，法院從「複選名冊」隨機抽選出本案「候選國民法官」，並於選任程序期日30日前通知到庭。\n・第三階段-選任程序：選任當天排除不合格或得拒絕者，檢辯雙方亦可不附理由排除部分人員（各至多4人），最後隨機抽選出6名國民法官及備位國民法官。\n出處：司法院國民法官專區常見問答 Q3609\n\nQ3610（選任流程）問：我收到備選國民法官通知書了，接下來要做什麼呢？\n答：這只是通知您已被抽選並通過審核成為次年度的備選國民法官，代表明年有案件時您有機會被抽選為候選國民法官，方便您進行心理建設或生活規劃。\n出處：司法院國民法官專區常見問答 Q3610\n\nQ3611（選任流程）問：什麼時候會通知我要上法院及要去多久？\n答：法院會在選任程序期日30日前通知候選國民法官到庭。選任程序約數小時至半日（少數需一日）。若被選為國民法官，則需參與後續審判直至宣判為止。\n出處：司法院國民法官專區常見問答 Q3611\n\nQ3612（選任流程）問：收到候選國民法官通知單及調查表怎麼辦？\n答：請據實填載調查表後回傳法院，並依照指定時間攜帶通知單到指定法院報到參加選任程序。\n出處：司法院國民法官專區常見問答 Q3612\n\nQ3613（拒絕與免除）問：收到通知單後，就一定要去法院參加選任程序嗎？\n答：如果有不符合資格或屬於可拒絕擔任的情形，請先填載「參與資格及意願調查表」回覆法院，法院會決定您是否需要親自到庭並告知結果。\n出處：司法院國民法官專區常見問答 Q3613\n\nQ3614（選任流程）問：選任時會問什麼？有沒有歷屆試題可以參考？\n答：詢問是為了查明資格與是否有不能或得拒絕擔任的情形，不需要特別準備，也沒有歷屆試題，只需據實陳述即可。\n出處：司法院國民法官專區常見問答 Q3614\n\nQ3615（保密）問：我可以告訴親朋好友、公司長官及同事，我成為國民法官(備位國民法官)、候選國民法官嗎？\n答：可以告知親友及長官、同事以便處理請假與日常事務，但不得透露審判上知悉的事項與細節。他人未經您同意不得隨意公開足以辨識您個人身分的資料。\n出處：司法院國民法官專區常見問答 Q3615\n\nQ3616（審判過程）問：擔任國民法官會不會很花時間？開庭會不會開到很晚？\n答：法院會準備審理計畫書並集中審理日程，多數案件可以在1至2週內完成審理。開庭會注意休息時間安排，避免過於疲勞。\n出處：司法院國民法官專區常見問答 Q3616\n\nQ3617（審判過程）問：國民法官要做哪些事？\n答：1. 審理：與法官一同坐在法檯上，全程參與審判程序。\n2. 訊問：可以補充訊問或詢問被告、被害人、鑑定人、證人等。\n3. 定罪：與法官共同決定有沒有罪、應判何罪。\n4. 量刑：與法官共同決定有罪時的刑度輕重。\n出處：司法院國民法官專區常見問答 Q3617\n\nQ3618（審判過程）問：會有書面資料嗎？我拿到的資料跟職業法官手上的資料是一樣的嗎？\n答：原則上會提供給國民法官，且拿到的資料與職業法官都是一致的。國民法官法庭著重在法庭上以「眼見耳聞」方式呈現人證與物證。\n出處：司法院國民法官專區常見問答 Q3618\n\nQ3619（審判過程）問：我能夠在短時間內了解案情嗎？\n答：可以。職業法官會全程協助解答疑問，檢辯雙方也會說明主張。制度採用「起訴狀一本主義」，不在事前給予大量卷宗，避免產生先入為主的偏見，讓國民法官專注於法庭上的法庭活動。\n出處：司法院國民法官專區常見問答 Q3619\n\nQ3620（審判過程）問：審判程序是如何進行的呢？\n答：選任宣誓 ➔ 審前說明 ➔ 確認被告身分及起訴事實 ➔ 檢辯開審陳述 ➔ 調查證據（人證/物證/書證）➔ 辯論程序 ➔ 評議程序 ➔ 宣示判決。\n出處：司法院國民法官專區常見問答 Q3620\n\nQ3621（審判過程）問：國民法官可以當庭要求調查證據嗎？\n答：原則上證據調查項目會在審前準備程序決定完畢。若審判中檢辯聲請新證據，由3位職業法官討論決定，決定前會聽取國民法官的意見。\n出處：司法院國民法官專區常見問答 Q3621\n\nQ3622（拒絕與免除）問：我可以中途退出嗎？\n答：原則上必須全程到庭，不可中途退出。若遇突發事件無法繼續，法院得裁定解任並由備位國民法官遞補。\n出處：司法院國民法官專區常見問答 Q3622\n\nQ3623（評議）問：評議程序是什麼？\n答：由職業法官與國民法官共同討論，經由表決來決定被告是否有罪、成立何罪及判處多重刑罰的程序。\n出處：司法院國民法官專區常見問答 Q3623\n\nQ3624（評議）問：職業法官會聽我的意見嗎？\n答：會。審判長在評議時會公平給予每位成員自主陳述意見與充分討論的機會，讓國民法官與職業法官立於對等立場進行對話。\n出處：司法院國民法官專區常見問答 Q3624\n\nQ3625（評議）問：評議時，我一定要表示意見嗎？我可以拒絕表態嗎？\n答：依規定所有國民法官都必須在評議時表示意見並參與表決，不可拒絕表態。討論時可自由陳述，不必勉強與他人一致。\n出處：司法院國民法官專區常見問答 Q3625\n\nQ3626（評議）問：我會不會被法官、檢察官、被告、辯護人誤導而做出錯誤的判決？\n答：審判長會依法行使訴訟指揮權，防止檢辯雙方使用未經許可的資料（如媒體報導），避免心證受到不當干擾。\n出處：司法院國民法官專區常見問答 Q3626\n\nQ3627（評議）問：國民法官可以判死刑嗎？\n答：可以。在可能判處死刑的案件中，認定有罪及判處死刑均須經國民法官與職業法官 2/3以上（即6票）同意，且應包含國民法官3人以上及法官3人同意。\n出處：司法院國民法官專區常見問答 Q3627\n\nQ3628（評議）問：如果最後針對量刑的投票結果，都不一致怎麼辦？\n答：量刑投票需達過半數同意（死刑需2/3）。若未達門檻，會將「最不利於被告」的刑度票數順次算入「次不利」的票數內，直到達到法定同意門檻為止。\n出處：司法院國民法官專區常見問答 Q3628\n\nQ3629（評議）問：國民法官做出來的判決可以上訴嗎？會不會被上訴審法院推翻呢？\n答：可以上訴，但法律要求上訴審法院應儘量尊重國民法官法庭之判決，且上訴門檻較一般案件更為嚴格，要推翻判決難度較高。\n出處：司法院國民法官專區常見問答 Q3629\n\nQ3630（保密）問：國民法官可以看關於案件的相關新聞報導嗎？會不會受到媒體或外部的輿論而影響判決？\n答：法官會提醒開庭期間返家後勿討論案件或搜尋相關報導，必須嚴格依據法庭上呈現的證據進行認定，恪守公正客觀。\n出處：司法院國民法官專區常見問答 Q3630\n\nQ3631（權益保障）問：國民法官會不會受到外力而影響判決（如收買、施壓等）？\n答：法律設有重罰。國民法官收賄可處3-10年有期徒刑並科罰金；對國民法官施壓或恐嚇者亦會加重刑罰。\n出處：司法院國民法官專區常見問答 Q3631\n\nQ3632（保密）問：如果判決被「炎上」(媒體、輿論抨擊)，我可以發文或接受採訪揭發評議過程嗎？\n答：不行。國民法官負有終身保密義務，絕對不可透露評議討論過程、投票結果及職務上知悉的個人隱私。\n出處：司法院國民法官專區常見問答 Q3632\n\nQ3633（保密）問：我可以公開或跟親友談論我擔任國民法官時所得知的案件資訊嗎？\n答：可以分享擔任國民法官的心得與感想，但絕對不能透露任何未公開的個人資訊及評議秘密。\n出處：司法院國民法官專區常見問答 Q3633\n\nQ3634（權益保障）問：國民法官有什麼義務？\n答：包含8大義務：宣誓、嚴守秘密、全程到庭、據實陳述、公正獨立、參與審判、參與評議、聽從訴訟指揮。\n出處：司法院國民法官專區常見問答 Q3634\n\nQ3635（費用與補助）問：我家上有老下有小或身心障礙者需要照顧，但還是想擔任國民法官怎麼辦？\n答：法院與相關機關可結合在地資源，提供臨時托育、照護服務等實質協助，請於收到通知時向法院勾選需求。\n出處：司法院國民法官專區常見問答 Q3635\n\nQ3636（費用與補助）問：我家在遠得要命的王國，怎麼辦？\n答：法院只會由您戶籍地管轄法院抽選。若實際住處較遠，法院會核實補助交通費，必要時也會協助安排住宿。\n出處：司法院國民法官專區常見問答 Q3636\n\nQ3637（費用與補助）問：擔任國民法官會有酬勞可以領嗎？\n答：會。\n・國民法官／備位國民法官：原則每日可領 3,000元 日費。\n・候選國民法官：到庭原則可領 1,500元 日費。 （另核實支給交通費及必要之住宿費）\n出處：司法院國民法官專區常見問答 Q3637\n\nQ3638（權益保障）問：我可以請公假嗎？我會不會受到雇主職務上的處分？\n答：依《國民法官法》第39條，雇主必須給予公假，且不得做出任何職務上的不利處分。法院會開立「到庭證明書」供向雇主請假。\n出處：司法院國民法官專區常見問答 Q3638；國民法官法第39條\n\nQ3639（權益保障）問：擔任國民法官，被告或其他相關人會不會找上我？\n答：不會。個人真實姓名及身分資料全程保密，法庭上皆以數字代號稱呼。不當接觸或關說皆屬犯罪行為。\n出處：司法院國民法官專區常見問答 Q3639\n\nQ3640（權益保障）問：國民法官會受到哪些保護？會不會影響自己或家人的人身安全？\n答：個資不公開、法庭禁止拍照、評議意見保密。對國民法官及其親屬實施犯罪者加重處罰；若有安全顧慮之重大案件，法院亦得例外改由職業法官審理。\n出處：司法院國民法官專區常見問答 Q3640\n\nQ3641（權益保障）問：如果我因為擔任了國民法官(備位國民法官)並且在看見相關卷證之後產生了焦慮等心理或精神上壓力怎麼辦？\n答：若案件包含血腥照片等可能造成壓力的卷證，選任時法院會先告知並確認意願；開庭期間審判長亦會留意維護身心負擔。司法院設有國民法官心理輔導與諮商協助措施，如有不適可隨時聯繫法院尋求支援。\n出處：司法院國民法官專區常見問答 Q3641\n\nA001（到庭須知）問：可以帶寵物或導盲犬去法院嗎？\n答：一般寵物不能帶進法院；導盲犬可以。以臺北地方法院為例，院內規定任何人不得攜帶動物進入法院，但導盲犬除外。各地方法院的規定可能不同，如有特殊需求（例如需要協助動物陪同），請事先聯繫承辦法院確認。\n出處：臺灣臺北地方法院安全維護實施要點第四點第三款";
+const DELIB = "你要主持一場國民法官模擬評議。使用者是第 6 位國民法官。全部內容是改編自司法院公開的模擬法庭教材，人名皆為代號，並非真實案件。請用親切、白話的繁體中文。\n\n【案情：只能使用以下事實，不可以新增或修改】\n被告甲、被告乙都是 22 歲，兩人都沒有汽車駕駛執照。某天下午 5 時 30 分，天候下雨、正值下班尖峰，兩人各開一台自用小客車，從同一間修車廠出發前往中山區。\n在速限每小時 50 公里的路段，乙開 B 車在前、甲開 A 車在後，以時速約 60 到 70 公里一同駛入公車專用道。接近公車停靠站時，兩人都沒有打方向燈，也沒有和一台銀色小客車保持安全距離，就向右切出公車專用道，插入銀色小客車前方，之後再以同樣速度回到公車專用道。\n下午 5 時 45 分，接近另一個公車停靠站時，兩人再度沒打方向燈，先後以時速 80 公里以上向右切出公車專用道。當時右側車道剛好有一輛機車，乙緊急煞車，沒有撞到機車；甲也緊急煞車，但因車速過快而失控，A 車衝向最外側車道，撞上停在路邊的小貨車車尾後衝進騎樓，站在附近的 3 名行人來不及閃避，都因傷重死亡。\n檢察官起訴：甲、乙都犯「無駕駛執照以他法致生公眾往來危險致人於死罪」（刑法第 185 條第 2 項、道路交通管理處罰條例第 86 條第 1 項）。\n\n【可以引用的法律說明：出自本案審前說明書】\n・刑法第 185 條第 1 項：以他法致生往來之危險者，處五年以下有期徒刑、拘役或一萬五千元以下罰金。第 2 項：因而致人於死者，處無期徒刑或七年以上有期徒刑。\n・道路交通管理處罰條例第 86 條第 1 項：無駕駛執照駕車，因而致人受傷或死亡，依法應負刑事責任者，加重其刑至二分之一。\n・刑法第 276 條：因過失致人於死者，處五年以下有期徒刑、拘役或五十萬元以下罰金。\n・故意：知道自己在做什麼，也知道可能的結果，仍然決定去做；預見結果發生，而發生也不違背本意，也算故意。\n・過失：應注意、能注意而不注意；或預見可能發生，卻確信不會發生。\n・加重結果犯（刑法第 17 條）：行為人不能預見結果發生時，不適用加重處罰。\n・共同正犯（刑法第 28 條）：二人以上共同實行犯罪之行為者，皆為正犯。\n・量刑（刑法第 57 條）：要審酌犯罪動機、手段、違反義務程度、造成的損害、犯後態度等。\n・刑法第 59 條：犯罪情狀顯可憫恕，科以最低度刑仍嫌過重者，得酌量減輕其刑。\n・刑事審判基本原則：無罪推定、檢察官負舉證責任、只能依法庭上的證據判斷（新聞不算證據）、罪疑唯輕（有懷疑時作有利被告的認定）。\n\n【評議室成員】\n・審判長：主持討論、保持中立，不先講自己的結論，負責解釋法律概念。\n・陪席法官 2 位：發言少，只在被問到法律問題時簡短說明。\n・國民法官 1 號：計程車司機，每天在路上開車，對危險駕駛特別有感。\n・國民法官 2 號：退休國小老師，常想到年輕人還有改過的機會。\n・國民法官 3 號：家管，有小孩，容易站在被害人家屬的角度想。\n・國民法官 4 號：工程師，習慣一步一步看證據和邏輯。\n・國民法官 5 號：大學生，和被告同年紀。\n・國民法官 6 號：就是使用者。\n\n【評議流程：依序進行三個爭點，一次只討論一個】\n爭點一：被告甲（撞到人的後車駕駛）是故意製造交通危險，還是只是過失？如果是前者，他對 3 人死亡的結果能不能預見？\n爭點二：被告乙（沒撞到人的前車駕駛）要不要和甲一起對 3 人死亡負責？兩人算不算「共同」實行？\n爭點三：如果有罪，刑度要重還是輕？請使用者從四個選項中選一個：法定最低刑附近、中間、偏重、認為應適用第 59 條酌減。\n\n每個爭點的進行方式：\n1. 審判長用兩三句話說明這個爭點在問什麼。\n2. 請 2 到 3 位國民法官各說一段話，意見要有分歧，各自引用案情中的具體事實。\n3. 問使用者的看法，等使用者回答後，請 1 位成員回應或提出不同角度。\n4. 審判長宣布投票，列出 9 位成員各自的票（3 位法官加 6 位國民法官，使用者的票照他的回答計算），並說明是否達到門檻。\n\n【表決規則】\n・認定有罪：需要 9 人中 2/3 以上（至少 6 票）同意，而且贊成者中至少要有 1 位法官和 1 位國民法官。\n・決定刑度：需要過半數同意，而且同樣要包含法官和國民法官雙方的意見。\n\n【規則】\n1. 不可以新增案情中沒有的事實或證據，例如被告的前科、酒駕、證人說法。使用者問到案情沒有的資訊時，審判長回答：「這個部分法庭上沒有提出證據，我們不能列入考慮。」\n2. 不可以告訴使用者「正確答案」，也不要評論真實案件的判決。\n3. 尊重使用者的任何意見，不要批評他。\n4. 每次回覆不超過 250 字。一次只進行一個步驟，等使用者回覆再繼續。\n5. 三個爭點都結束後，審判長做總結，並提醒：「在真正的審判中，評議過程與每個人的投票都要終身保密。」最後問使用者：「體驗完之後，如果真的收到通知，你會願意去嗎？」";
+const ALT = {"Q3601": "國民法官是做什麼的？｜國民法官跟陪審團一樣嗎？", "Q3602": "為什麼要讓一般人來審判？｜國民法官制度有什麼意義？", "Q3603": "什麼案子會用到國民法官？｜酒駕撞死人的案子會有國民法官嗎？", "Q3604": "我有資格當國民法官嗎？｜幾歲可以當國民法官？｜外國人可以當嗎？", "Q3605": "23 歲當法官不會太年輕嗎？｜為什麼是 23 歲？", "Q3606": "什麼人不能當國民法官？｜警察可以當國民法官嗎？", "Q3607": "可以不去嗎？｜我是學生可以拒絕嗎？｜不去會被罰嗎？", "Q3608": "我完全不懂法律也可以當嗎？｜聽不懂法律名詞怎麼辦？", "Q3609": "國民法官是怎麼被抽中的？｜選任流程是什麼？", "Q3610": "收到備選國民法官通知書要做什麼？｜備選是不是就要去法院了？", "Q3611": "要去法院多久？｜什麼時候會通知我去法院？", "Q3612": "收到候選通知單和調查表要怎麼處理？｜調查表要怎麼填？", "Q3613": "收到通知一定要去嗎？｜如果我符合拒絕條件還要跑一趟嗎？", "Q3614": "選任當天會問什麼？｜要不要先準備什麼？", "Q3615": "可以跟公司說我被抽中嗎？｜可以告訴家人嗎？", "Q3616": "當國民法官要花多久時間？｜會開庭到很晚嗎？", "Q3617": "國民法官要做什麼事？｜國民法官的工作內容是什麼？", "Q3618": "會發資料給我看嗎？｜我看到的資料跟法官一樣嗎？", "Q3619": "我看得懂案情嗎？｜為什麼不先給我看卷宗？", "Q3620": "開庭的流程是什麼？｜審判會怎麼進行？", "Q3621": "我可以要求調查新證據嗎？", "Q3622": "做到一半可以不做嗎？｜中途有急事怎麼辦？", "Q3623": "評議是什麼？｜評議要做什麼？", "Q3624": "法官會聽我的意見嗎？｜國民法官講話有用嗎？", "Q3625": "評議時可以不表態嗎？｜一定要投票嗎？", "Q3626": "我會不會被律師誤導？｜怕判錯怎麼辦？", "Q3627": "國民法官可以判死刑嗎？｜死刑要幾票？", "Q3628": "量刑投票意見不一樣怎麼辦？｜刑度是怎麼決定的？", "Q3629": "判決可以上訴嗎？｜國民法官的判決會被推翻嗎？", "Q3630": "可以看案件的新聞嗎？｜回家可以上網查案子嗎？", "Q3631": "有人收買或威脅我怎麼辦？｜施壓國民法官會怎樣？", "Q3632": "判決被罵可以出來解釋嗎？｜可以接受媒體採訪嗎？", "Q3633": "可以跟朋友聊案子嗎？｜可以發文分享心得嗎？", "Q3634": "國民法官有哪些義務？｜當國民法官要遵守什麼？", "Q3635": "家裡有小孩要顧怎麼辦？｜要照顧長輩還能當嗎？", "Q3636": "住很遠怎麼辦？｜交通費誰出？｜會幫忙安排住宿嗎？", "Q3637": "當國民法官有錢領嗎？｜車馬費只有 200 元嗎？｜去選任一天領多少？", "Q3638": "公司會扣薪嗎？｜可以請公假嗎？｜老闆會不會因此找我麻煩？", "Q3639": "被告會不會來找我？｜會不會被報復？", "Q3640": "我的個資會被公開嗎？｜家人安全有保障嗎？", "Q3641": "看到血腥照片很害怕怎麼辦？｜有心理輔導嗎？", "A001": "可以帶狗去法院嗎？｜導盲犬可以進法庭嗎？｜家裡寵物沒人顧可以帶去嗎？"};
+
+/* ---------- pixel renderer ---------- */
+const cv = document.getElementById('cv'), g = cv.getContext('2d');
+const W = 192, H = 108;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const R = (x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x|0,y|0,w|0,h|0)};
+const P = {skin:'#f0c39a',skin2:'#d9a27a',hair:'#2b2230',hair2:'#6b4a33',hairG:'#b9b4b0',robe:'#1d1d26'};
+function person(x,y,o={}){ // 8 wide, 15 tall, feet at y+15
+  const s=o.skin||P.skin;
+  R(x+1,y,6,3,o.hair||P.hair); R(x+1,y+2,6,4,s); R(x+1,y+2,1,2,o.hair||P.hair);
+  R(x+2,y+4,1,1,'#222'); R(x+5,y+4,1,1,'#222');
+  R(x,y+6,8,6,o.body||'#5a7a9a');
+  if(o.trim){R(x+3,y+6,2,6,o.trim);}
+  R(x-1,y+7,1,4,o.body||'#5a7a9a'); R(x+8,y+7,1,4,o.body||'#5a7a9a');
+  if(!o.seated){R(x+1,y+12,2,3,o.legs||'#2d2d3a'); R(x+5,y+12,2,3,o.legs||'#2d2d3a');}
+  if(o.mark){R(x+3,y-4,2,2,'#e2a83c'); R(x+3,y-6,2,1,'#e2a83c');}
+}
+const CAST = {
+  me:{body:'#e2a83c',hair:P.hair2},
+  chief:{body:P.robe,trim:'#3d6fd1',hair:P.hairG},
+  j2:{body:P.robe,trim:'#3d6fd1'},
+  j3:{body:P.robe,trim:'#3d6fd1',hair:P.hair2},
+  l1:{body:'#d0d4dc',hair:'#3a3a3a'},             // 計程車司機
+  l2:{body:'#8b6fae',hair:P.hairG},               // 退休老師
+  l3:{body:'#c97b6b'},                            // 家管
+  l4:{body:'#4e7d6a'},                            // 工程師
+  l5:{body:'#e0d36a',hair:'#1a1a1a'},             // 大學生
+  pros:{body:P.robe,trim:'#8a4fc9'},              // 檢察官 紫邊
+  def:{body:P.robe,trim:'#f2f2f2'},               // 律師 白邊
+  clerk:{body:'#2f4d73'},
+  dA:{body:'#7a8a96'}, dB:{body:'#9a8a76'},
+};
+
+const st = {bg:'home', t:0, votes:null, road:{ph:0,from:0,at:0}, flash:0};
+let rain = Array.from({length:60},()=>[Math.random()*W,Math.random()*H]);
+
+const scenes = {
+  home(t){
+    R(0,0,W,H,'#e6d6b8'); R(0,70,W,38,'#a07a55');
+    for(let x=0;x<W;x+=16) R(x,70,1,38,'#8d6a49');
+    R(18,14,44,32,'#5b7fa8'); R(18,14,44,32,'#5b7fa8'); R(39,14,2,32,'#e6d6b8'); R(18,29,44,2,'#e6d6b8');
+    R(18,14,44,2,'#7d5a3d'); R(18,44,44,2,'#7d5a3d');
+    R(120,52,52,6,'#7d5a3d'); R(124,58,4,20,'#6a4a30'); R(164,58,4,20,'#6a4a30');
+    R(138,44,18,8,'#c9653a'); R(140,40,14,4,'#3e8a5a');
+    // envelope on table
+    R(126,47,14,5,'#fbf6ea'); R(126,47,14,1,'#c9b994');
+    if(((t/500)|0)%2===0||reduce) R(131,48,3,3,'#c8463d');
+    person(80,56,CAST.me);
+  },
+  hall(t){
+    R(0,0,W,H,'#d9d2c2'); R(0,62,W,46,'#8a8f9e');
+    R(0,0,W,10,'#5b5f7a'); R(70,14,52,10,'#7a2b2b'); // banner
+    R(72,16,48,6,'#a33a3a');
+    R(78,38,36,10,'#7d5a3d'); person(92,26,CAST.clerk);
+    for(let row=0;row<3;row++) for(let c=0;c<9;c++){
+      const x=12+c*20,y=64+row*14;
+      R(x,y+8,12,3,'#4a4f63');
+      if((c+row)%3!==1) person(x+2,y-2,{seated:true,body:['#7a9ab0','#b07a7a','#7ab08a','#b0a27a','#8a7ab0'][(c+row*2)%5],hair:[P.hair,P.hair2,P.hairG][(c*row)%3]});
+    }
+    person(12+4*20+2,64+28-2,{...CAST.me,seated:true,mark:true});
+  },
+  court(t){
+    R(0,0,W,H,'#cdbd9f'); R(0,0,W,6,'#8d6a49');
+    R(0,40,W,8,'#7d5a3d'); R(0,36,W,4,'#9a7652'); // bench
+    const seats=[CAST.l1,CAST.l2,CAST.l3,CAST.j2,CAST.chief,CAST.j3,CAST.l4,CAST.l5,CAST.me];
+    seats.forEach((c,i)=>person(12+i*20,22,{...c,seated:true,mark:c===CAST.me}));
+    R(0,48,W,60,'#b49f7c');
+    R(10,70,40,8,'#7d5a3d'); person(24,58,{...CAST.pros,seated:true}); // prosecutor left
+    R(142,70,40,8,'#7d5a3d'); person(150,58,{...CAST.def,seated:true}); person(166,58,{...CAST.dA,seated:true});
+    R(146,92,40,6,'#7d5a3d'); person(170,82,{...CAST.dB,seated:true});
+    R(86,80,20,10,'#7d5a3d'); // witness stand
+  },
+  road(t){
+    R(0,0,W,H,'#3b3f4a');
+    R(0,8,W,4,'#6d7d5a');                 // median
+    R(0,12,W,16,'#8c4a42');               // bus lane
+    for(let x=0;x<W;x+=12){R(x,44,6,1,'#d9d9d9');R(x,60,6,1,'#d9d9d9');}
+    R(0,28,W,1,'#e8d26a');
+    R(0,78,W,3,'#9a9a9a'); R(0,81,W,27,'#7a6f66'); // curb + 騎樓
+    for(let x=6;x<W;x+=30) R(x,81,4,27,'#5e554e');
+    R(48,4,18,4,'#cfcfcf'); R(150,4,18,4,'#cfcfcf'); // bus stops
+    R(170,66,18,10,'#e0e0e0'); R(170,66,6,10,'#4a6a9a'); // parked truck
+    const k=road();
+    if(!k.gone) {R(k.ped[0],90,3,6,'#d6c08a');R(k.ped[0]+6,92,3,6,'#8ab0d6');R(k.ped[0]+12,90,3,6,'#d68a8a');}
+    car(k.S,'#bfc5cc'); if(k.M) moto(k.M); car(k.B,'#e0893a','乙'); car(k.A,'#3fb0a8','甲');
+    if(!reduce){g.fillStyle='rgba(200,220,255,.45)';rain.forEach(p=>{p[1]=(p[1]+2.2)%H;p[0]=(p[0]+0.6)%W;g.fillRect(p[0]|0,p[1]|0,1,3)});}
+    else{g.fillStyle='rgba(200,220,255,.35)';rain.forEach(p=>g.fillRect(p[0]|0,p[1]|0,1,3))}
+    if(st.flash>0){g.fillStyle=`rgba(255,255,255,${st.flash})`;g.fillRect(0,0,W,H);st.flash=Math.max(0,st.flash-0.02)}
+  },
+  room(t){
+    R(0,0,W,H,'#c9c3b4'); R(0,74,W,34,'#7d7a86');
+    R(150,10,30,22,'#8fb3cf'); R(164,10,2,22,'#c9c3b4');
+    R(50,50,92,22,'#7d5a3d'); R(50,48,92,4,'#9a7652');
+    const top=[CAST.l1,CAST.l2,CAST.j2,CAST.chief,CAST.j3,CAST.l3,CAST.l4];
+    top.forEach((c,i)=>person(54+i*13,34,{...c,seated:true}));
+    person(36,52,{...CAST.l5,seated:true}); person(148,52,{...CAST.me,seated:true,mark:true});
+    const pos=[[36,52],[54,34],[67,34],[80,34],[93,34],[106,34],[119,34],[132,34],[148,52]]; // order matches SEATS
+    if(st.votes) st.votes.forEach((v,i)=>{ if(v==null)return; const [x,y]=pos[i];
+      R(x,y-12,8,8,'#fbf6ea'); R(x+3,y-4,2,2,'#fbf6ea');
+      g.fillStyle=v?'#3f9a5e':'#c8463d';
+      if(v){R(x+2,y-10,4,1,g.fillStyle);R(x+1,y-9,1,4,g.fillStyle);R(x+6,y-9,1,4,g.fillStyle);R(x+2,y-5,4,1,g.fillStyle);}
+      else{for(let d=0;d<5;d++){R(x+1+d,y-10+d,1,1,g.fillStyle);R(x+5-d,y-10+d,1,1,g.fillStyle);}}
+    });
+  },
+  outside(t){
+    const sky=['#f3b46b','#e88a5a','#a95a6a'];
+    sky.forEach((c,i)=>R(0,i*14,W,14,c)); R(0,42,W,66,'#9a9fb3');
+    R(36,22,120,50,'#d8d2c4'); R(30,18,132,6,'#b8b0a0'); R(30,16,132,2,'#8a8270');
+    for(let i=0;i<6;i++) R(44+i*20,26,8,40,'#efe9dc');
+    R(26,72,140,4,'#c8c2b4'); R(20,76,152,4,'#b8b2a4'); R(14,80,164,4,'#a8a294');
+    R(146,6,10,10,'#ffe7a8');
+    person(92,86,CAST.me);
+  },
+};
+function car(p,c,label){ if(!p)return; const [x,y,rot]=p;
+  g.save(); g.translate(x|0,y|0); if(rot) g.rotate(rot);
+  g.fillStyle=c; g.fillRect(-7,-4,14,8); g.fillStyle='#1b1f3a'; g.fillRect(-2,-3,4,6); g.fillStyle='#fff7c0'; g.fillRect(6,-3,1,2); g.fillRect(6,1,1,2); g.restore();
+  if(label){g.fillStyle='#fff';g.font='6px sans-serif';g.fillText(label,(x|0)-3,(y|0)-6)}
+}
+function moto(p){R(p[0]-3,p[1]-1,7,3,'#e5e5e5');R(p[0]-1,p[1]-3,2,2,'#c84')}
+const ROAD = [ // [A, B, silver, moto] per phase
+  {A:[8,52],B:[24,52],S:[60,36]},
+  {A:[40,20],B:[56,20],S:[66,36]},
+  {A:[86,36],B:[100,36],S:[70,36]},
+  {A:[110,20],B:[126,20],S:[80,36]},
+  {A:[140,36,.15],B:[156,36],S:[90,36],M:[170,36]},
+  {A:[166,84,1.2],B:[158,36],S:[96,36],M:[178,36],gone:true},
+];
+function road(){
+  const r=st.road, k=ROAD[r.ph], j=ROAD[r.from], f=reduce?1:Math.min(1,(performance.now()-r.at)/1200);
+  const L=(a,b)=>a&&b?[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,(a[2]||0)+((b[2]||0)-(a[2]||0))*f]:b;
+  return {A:L(j.A,k.A),B:L(j.B,k.B),S:L(j.S,k.S),M:k.M,ped:[120],gone:k.gone&&f>=1};
+}
+function loop(t){st.t=t;g.clearRect(0,0,W,H);(scenes[st.bg]||scenes.home)(t);requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+
+/* ---------- sound (synthesized with Web Audio, no files) ---------- */
+const SFX=(()=>{
+  let ctx=null, master=null, noise=null, rain=null, eng=null;
+  let on=true; try{ on=localStorage.getItem('sfx')!=='off' }catch(e){}
+  function init(){ if(ctx||!on) return; const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    ctx=new AC(); master=ctx.createGain(); master.gain.value=.8; master.connect(ctx.destination);
+    noise=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const d=noise.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    if(wantRain) rainOn(); if(wantEng!=null) engine(wantEng); }
+  const now=()=>ctx.currentTime;
+  function env(node,peak,a,d,t0=now()){ const g=ctx.createGain(); g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(peak,t0+a); g.gain.exponentialRampToValueAtTime(.0001,t0+a+d); node.connect(g); g.connect(master); return g; }
+  function src(){ const s=ctx.createBufferSource(); s.buffer=noise; s.loop=true; return s; }
+  function filt(type,f,q=1){ const b=ctx.createBiquadFilter(); b.type=type; b.frequency.value=f; b.Q.value=q; return b; }
+  let wantRain=false, wantEng=null;
+  function rainOn(){ wantRain=true; if(!ctx||rain) return;
+    const s=src(), hp=filt('highpass',900), lp=filt('lowpass',6000), g=ctx.createGain(); g.gain.value=0;
+    g.gain.linearRampToValueAtTime(.22,now()+1.2); s.connect(hp).connect(lp).connect(g).connect(master); s.start();
+    const drops=setInterval(()=>{ if(!ctx) return; const o=ctx.createOscillator(); o.frequency.value=2500+Math.random()*2500; env(o,.015,.002,.04); o.start(); o.stop(now()+.06); },90);
+    rain={s,g,drops}; }
+  function rainOff(){ wantRain=false; if(!rain) return; const r=rain; rain=null; clearInterval(r.drops);
+    r.g.gain.cancelScheduledValues(now()); r.g.gain.setValueAtTime(r.g.gain.value,now()); r.g.gain.linearRampToValueAtTime(0,now()+.8); r.s.stop(now()+.9); }
+  function engine(level){ wantEng=level; if(!ctx) return;
+    if(level==null){ if(eng){ const e=eng; eng=null; e.g.gain.setTargetAtTime(0,now(),.15); e.o.stop(now()+.8); e.o2.stop(now()+.8);} return; }
+    if(!eng){ const o=ctx.createOscillator(), o2=ctx.createOscillator(), lp=filt('lowpass',380,4), g=ctx.createGain();
+      o.type='sawtooth'; o2.type='square'; o2.detune.value=8; g.gain.value=0; o.connect(lp); o2.connect(lp); lp.connect(g).connect(master); o.start(); o2.start(); eng={o,o2,lp,g}; }
+    const f=[48,70,92,78,118][level]||60;
+    eng.o.frequency.setTargetAtTime(f,now(),.35); eng.o2.frequency.setTargetAtTime(f/2,now(),.35);
+    eng.lp.frequency.setTargetAtTime(300+f*4,now(),.35); eng.g.gain.setTargetAtTime(.05+level*.012,now(),.2);
+    if(level>=2){ const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(f*1.4,now()); o.frequency.exponentialRampToValueAtTime(f*2.4,now()+.5); const l=filt('lowpass',900); o.connect(l); env(l,.07,.05,.6); o.start(); o.stop(now()+.7); } }
+  function crash(){ if(!ctx) return; const t=now(); engine(null);
+    const s=src(), bp=filt('bandpass',2600,8); bp.frequency.setValueAtTime(3200,t); bp.frequency.linearRampToValueAtTime(1800,t+.7); s.connect(bp); env(bp,.35,.02,.75,t); s.start(t); s.stop(t+.9);
+    const t2=t+.75, b=src(), lp=filt('lowpass',700); b.connect(lp); env(lp,.9,.005,1.4,t2); b.start(t2); b.stop(t2+1.6);
+    const o=ctx.createOscillator(); o.frequency.setValueAtTime(110,t2); o.frequency.exponentialRampToValueAtTime(28,t2+.5); env(o,.9,.005,.7,t2); o.start(t2); o.stop(t2+.8);
+    for(let i=0;i<14;i++){ const k=ctx.createOscillator(), at=t2+.08+Math.random()*.7; k.type='triangle'; k.frequency.value=3000+Math.random()*4000; env(k,.05,.002,.12,at); k.start(at); k.stop(at+.15); } }
+  function gavel(n=2){ if(!ctx) return; for(let i=0;i<n;i++){ const t=now()+i*.32;
+    const o=ctx.createOscillator(); o.frequency.setValueAtTime(190,t); o.frequency.exponentialRampToValueAtTime(70,t+.12); env(o,.7,.002,.18,t); o.start(t); o.stop(t+.2);
+    const s=src(), lp=filt('lowpass',1800); s.connect(lp); env(lp,.45,.001,.05,t); s.start(t); s.stop(t+.08); } }
+  function chime(notes=[660,880]){ if(!ctx) return; notes.forEach((f,i)=>{ const t=now()+i*.13, o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=f; env(o,.12,.01,.6,t); o.start(t); o.stop(t+.7); }); }
+  function blip(f=520){ if(!ctx) return; const o=ctx.createOscillator(); o.type='square'; o.frequency.value=f; const l=filt('lowpass',1500); o.connect(l); env(l,.025,.002,.03); o.start(); o.stop(now()+.05); }
+  function paper(){ if(!ctx) return; const s=src(), bp=filt('bandpass',3500,1.2); s.connect(bp); env(bp,.12,.02,.25); s.start(); s.stop(now()+.3); }
+  function setOn(v){ on=v; try{localStorage.setItem('sfx',v?'on':'off')}catch(e){}
+    if(!v&&ctx){ const w=[wantRain,wantEng]; rainOff(); engine(null); wantRain=w[0]; wantEng=w[1]; ctx.close(); ctx=null; rain=null; eng=null; }
+    else init(); }
+  return {init,rainOn,rainOff,engine,crash,gavel,chime,blip,paper,setOn,get on(){return on}};
+})();
+const unlock=()=>SFX.init(); addEventListener('pointerdown',unlock); addEventListener('keydown',unlock);
+
+const sndBtn=document.getElementById('snd'); const sndLabel=()=>sndBtn.textContent=SFX.on?'♪ 音效：開':'♪ 音效：關'; sndLabel();
+sndBtn.onclick=()=>{SFX.setOn(!SFX.on);sndLabel()};
+/* ---------- dialogue engine ---------- */
+const $=id=>document.getElementById(id);
+const STAGES=['收到通知','填調查表','選任與宣誓','審前說明','起訴要旨','雙方主張','評議','宣判與回覆'];
+$('progress').innerHTML=STAGES.map(()=>'<i></i>').join('');
+function setStage(n){ $('stage').innerHTML=`STAGE ${n}/8<b>${STAGES[n-1]}</b>`;
+  [...$('progress').children].forEach((el,i)=>el.classList.toggle('on',i<n)); }
+let typing=null, waiting=null, finishTyping=null;
+function say(who,text){ return new Promise(res=>{
+  $('speaker').textContent=who||''; $('choices').innerHTML=''; $('next').hidden=false;
+  const el=$('text'); el.textContent=''; let i=0; const full=text;
+  const done=()=>{clearInterval(typing);typing=null;el.innerHTML=fmt(full);waiting=res;};
+  finishTyping=done;
+  if(reduce){done();return}
+  typing=setInterval(()=>{i+=2;if(i%6===0)SFX.blip(420+Math.random()*80);el.textContent=full.slice(0,i);if(i>=full.length)done()},28);
+})}
+function fmt(s){return esc(s).replace(/（(Q36\d\d[^）]*|A\d{3}[^）]*|刑法[^）]*|國民法官法[^）]*|道交[^）]*)）/g,'<span class="cite">（$1）</span>')}
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function advance(){ if(typing){finishTyping();return} if(waiting){const r=waiting;waiting=null;r()} }
+$('dialog').addEventListener('click',e=>{ if(e.target.closest('.choice'))return; advance(); });
+document.addEventListener('keydown',e=>{ if((e.key===' '||e.key==='Enter')&&$('modal').hidden&&$('phone').hidden&&!e.target.closest('input,button')){e.preventDefault();advance();} });
+function ask(who,text,opts){ return new Promise(res=>{
+  say(who,text); const show=()=>{ $('next').hidden=true;
+    $('choices').innerHTML=''; opts.forEach((o,i)=>{ if(!o)return; const b=document.createElement('button'); b.className='choice'+(o.ai?' ai':''); b.textContent=o.t||o; b.onclick=()=>{SFX.blip(700);res(i)}; $('choices').appendChild(b); });
+    $('choices').querySelector('button')?.focus({preventScroll:true}); };
+  const chk=setInterval(()=>{ if(!typing){clearInterval(chk); waiting=null; show();} },40);
+})}
+function scene(bg,place,stage){ if(bg!=='road'){SFX.rainOff();SFX.engine(null)} else SFX.rainOn(); if(bg==='court'&&st.bg!=='court')SFX.gavel(3); st.bg=bg; $('place').textContent=place; if(stage)setStage(stage); $('caption').hidden=true; }
+function caption(t){ const c=$('caption'); if(!t){c.hidden=true;return} c.textContent=t; c.hidden=false; }
+function modal(html,bind){ SFX.paper(); return new Promise(res=>{ $('doc').innerHTML=html; $('modal').hidden=false;
+  const close=v=>{$('modal').hidden=true;res(v)}; bind&&bind($('doc'),close);
+  $('doc').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>close(b.dataset.close));
+  $('doc').querySelector('button,input')?.focus({preventScroll:true}); })}
+function hint(q){ hintQ=q; $('badge').hidden=false; renderChips(); }
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+
+/* ---------- votes ---------- */
+// seat order: 5號,1號,2號,陪席,審判長,陪席,3號,4號,6號(你)
+const SEATS=[['5號',0],['1號',0],['2號',0],['陪席',1],['審判長',1],['陪席',1],['3號',0],['4號',0],['你',0]];
+function board(votes,title,ruleText,pass){
+  SFX.chime(pass?[523,659,784]:[523,415]);
+  const yes=votes.filter(Boolean).length;
+  return `<h3>${title}</h3><div class="sub">○ 贊成　× 反對</div>
+  <div class="board">${SEATS.map(([n,j],i)=>`<div class="seat ${j?'j':''} ${i===8?'me':''}"><div class="v ${votes[i]?'y':'n'}">${votes[i]?'○':'×'}</div>${n}</div>`).join('')}</div>
+  <p class="tally">贊成 ${yes} 票。${ruleText}<br>結果：<span class="${pass?'pass':'fail'}">${pass?'達到門檻':'未達門檻'}</span></p>
+  <p class="fine">其他成員的票是隨機劇本，每次體驗都不一樣，不代表正確答案。</p>
+  <button class="btn" data-close="1">繼續</button>`;
+}
+function guiltyCheck(v){ const y=v.map((x,i)=>x?i:-1).filter(i=>i>=0);
+  return y.length>=6 && y.some(i=>SEATS[i][1]) && y.some(i=>!SEATS[i][1]); }
+
+/* ---------- the story ---------- */
+const S={};
+async function story(){
+  st.votes=null; st.road={ph:0,from:0,at:0};
+  // 1
+  scene('home','你家客廳',1); hint('去一天有多少錢？');
+  await say('旁白','某天下午，你在信箱裡發現一封法院寄來的信。');
+  await say('你','法院？我又沒做什麼……');
+  await modal(`<div class="seal">○○地方<br>法院</div><h3>候選國民法官選任期日通知書</h3><div class="sub">體驗用範例，非真實文件</div>
+    <dl><dt>收件人</dt><dd>○○○ 先生／女士</dd><dt>選任期日</dt><dd>○年○月○日 上午 9:30</dd><dt>地點</dt><dd>○○地方法院 國民法官選任會場</dd>
+    <dt>附件</dt><dd>參與資格及意願調查表（請據實填寫後寄回）</dd><dt>日費</dt><dd>候選國民法官到庭 1,500 元，另核實支給交通費（Q3637）</dd></dl>
+    <p class="fine">很多人以為只有 200 元車馬費，其實到庭原則上可領 1,500 元日費；若被選為國民法官，每日 3,000 元。</p>
+    <button class="btn" data-close="1">收起通知書</button>`);
+  const c1=await ask('你','看起來好麻煩……',['可以不去嗎？','先看看到底要做什麼']);
+  if(c1===0) await say('手機小幫手','當國民法官是法定義務，原則上不能拒絕；但符合 70 歲以上、學生或老師、要照顧家人等情形，可以向法院說明理由。無正當理由不到，可能被罰新臺幣 3 萬元以下罰鍰。（Q3607）');
+  await say('手機小幫手','通知書會在選任期日 30 天前寄到。選任程序大約幾小時到半天。（Q3611）\n看不懂的地方，隨時點右下角的手機問我。');
+  // 2
+  scene('home','你家客廳',2); hint('我是學生可以拒絕嗎？');
+  await say('旁白','信封裡還有一張「參與資格及意願調查表」。先把它填好寄回法院。（Q3612）');
+  await surveyModal();
+  await say('旁白','如果符合可以拒絕的情形，法院會決定你還需不需要親自到庭，並通知你結果。（Q3613）\n這次體驗，我們先假設你沒有特殊狀況，照常前往法院。');
+  // 3
+  scene('hall','○○地方法院 選任會場',3); hint('公司會不會扣薪？');
+  await say('書記官','各位候選國民法官好，謝謝大家今天到場。等一下法官會問大家一些問題，不需要特別準備，照實回答就好。（Q3614）');
+  const c2=await ask('法官','請問你和本案的被告或被害人，有沒有認識或親戚關係？',['沒有','我不確定，因為還不知道他們是誰']);
+  if(c2===1) await say('法官','沒關係，等一下會說明案件的基本資料。如果發現認識的人，直接告訴我們就可以。這是為了確保審判公平。');
+  else await say('法官','謝謝。這些問題是為了確認資格，以及有沒有不能公平審判的情形。');
+  await say('旁白','接著，檢察官和辯護人可以不附理由，各自排除最多 4 位候選人。最後由電腦隨機抽出 6 位國民法官和備位國民法官。（Q3609）');
+  caption('抽選中……'); await sleep(reduce?200:1400); caption('國民法官 6 號：你');
+  await say('書記官','恭喜，你被選為國民法官 6 號。在法庭上大家只用號碼稱呼你，你的姓名和身分資料全程保密。（Q3639）');
+  await oathModal();
+  await say('旁白','宣誓完成。從現在起，你每天可以領 3,000 元日費，公司也必須給你公假，不能因此對你不利。（Q3637；Q3638；國民法官法第39條）');
+  // 4
+  scene('court','國民法官法庭',4); hint('可以看案件新聞嗎？');
+  await say('審判長','開始審理前，我先說明幾個原則。這些原則會陪你走完整個審判。');
+  await modal(`<h3>審前說明：四個原則</h3><div class="sub">出自本案審前說明書</div><div class="cards">
+    <div class="card"><span class="n">01</span><b>無罪推定</b>被告在判決確定前，都先推定為無罪。</div>
+    <div class="card"><span class="n">02</span><b>檢察官舉證</b>證明被告有罪的責任在檢察官，被告不必證明自己無罪。</div>
+    <div class="card"><span class="n">03</span><b>只看法庭上的證據</b>新聞、網路、親友的說法都不是證據。</div>
+    <div class="card"><span class="n">04</span><b>罪疑唯輕</b>有合理懷疑時，作有利於被告的認定。</div></div>
+    <button class="btn" data-close="1">我了解了</button>`);
+  const q1=await ask('小測驗','評議時，有人說：「我昨晚看新聞，記者說甲以前就常飆車。」這可以列入考慮嗎？',['可以，新聞也是一種資訊','不行，只能依法庭上的證據']);
+  await say('審判長', q1===1?'沒錯。審判期間也請不要上網搜尋這件案子，以免受到影響。（Q3630）':'這裡要特別注意：新聞不是證據。審判期間也請不要上網搜尋這件案子。（Q3630）');
+  const q2=await ask('小測驗','如果證據沒辦法讓你確信被告有罪，你應該怎麼做？',['判有罪比較保險','作有利於被告的認定']);
+  await say('審判長', q2===1?'答對了，這就是罪疑唯輕。':'其實應該相反。有合理懷疑時，要作有利於被告的認定，這就是罪疑唯輕。');
+  // 5
+  scene('road','案發路段（依起訴書重建）',5); hint('我看得懂案情嗎？');
+  await say('檢察官','接下來說明起訴的事實。被告甲、乙都是 22 歲，兩人都沒有汽車駕駛執照。');
+  await roadStep(0,'17:30｜雨天、下班尖峰'); await say('檢察官','某天下午 5 點 30 分，天正下著雨，兩人各開一台自用小客車，從同一間修車廠出發。乙開 B 車在前，甲開 A 車在後。');
+  await roadStep(1,'速限 50｜時速約 60–70'); await say('檢察官','在速限每小時 50 公里的路段，兩人以時速約 60 到 70 公里，一起駛入公車專用道。');
+  await roadStep(2,'沒打方向燈，切到銀色小客車前方'); await say('檢察官','接近公車停靠站時，兩人都沒有打方向燈，也沒有保持安全距離，就向右切出公車專用道，插到一台銀色小客車前方。');
+  await roadStep(3,'再回到公車專用道'); await say('檢察官','之後，兩人又以同樣的速度回到公車專用道。');
+  await roadStep(4,'17:45｜時速 80 以上，再次切出'); await say('檢察官','下午 5 點 45 分，接近另一個停靠站時，兩人再度沒打方向燈，先後以時速 80 公里以上向右切出。當時右側車道剛好有一輛機車。');
+  await roadStep(5,'乙煞停；甲失控撞進騎樓'); await say('檢察官','乙緊急煞車，沒有撞到機車。甲也緊急煞車，但因為車速太快而失控，撞上路邊小貨車的車尾後衝進騎樓。站在附近的 3 名行人來不及閃避，都因傷重死亡。');
+  while((await ask('旁白','要再看一次事發經過嗎？這段動畫是依照起訴書內容畫的示意圖，不是法庭上的證據。',['重播一次','繼續']))===0){ $('choices').innerHTML=''; await replayRoad(); }
+  caption(''); await say('檢察官','檢察官起訴甲、乙兩人，都犯無駕駛執照以他法致生公眾往來危險致人於死罪。（刑法第185條第2項；道交條例第86條第1項）');
+  // 6
+  scene('court','國民法官法庭',6); hint('被告會不會來找我？');
+  await say('檢察官','檢方認為，兩人在雨天、尖峰時段，一起高速穿梭車道，製造了危險，也因此造成 3 人死亡，兩人都應該負責。');
+  await say('辯護人','辯方請各位注意：本案關鍵在於被告當時心裡怎麼想、能不能預見這麼嚴重的結果，以及兩人之間是不是真的有「一起」這樣開的意思。請各位只依法庭上的證據判斷。');
+  await say('旁白','接著法庭會調查證據，詢問證人、檢視物證與書證，最後雙方辯論。（Q3620）\n國民法官也可以在這個階段補充發問。（Q3617）本體驗先略過這一段。');
+  // 7
+  scene('room','評議室',7); hint('評議時可以不表態嗎？'); st.votes=null;
+  await say('審判長','歡迎來到評議室。這裡只有我們 9 個人：3 位法官和 6 位國民法官。我會公平地讓每個人發言。（Q3624）');
+  if(sampleFn){ const m=await ask('審判長','你想怎麼進行？',['照劇本進行三個爭點',{t:'讓 AI 扮演評議室，自由討論（另開視窗）',ai:true}]);
+    if(m===1){ openDelib(); await say('旁白','AI 評議室已在右下角的手機打開。討論完回到這裡，我們再照劇本走一次投票。'); } }
+  // issue 1
+  await say('審判長','爭點一：甲（撞到人的後車）是故意製造交通危險，還是只是過失？如果是故意，他對 3 人死亡的結果能不能預見？');
+  await say('1號・計程車司機','我天天在路上開車。下雨、尖峰、沒打燈、時速 80 以上連續切車道，這不是不小心，是明知道危險還這樣開。');
+  await say('2號・退休老師','他才 22 歲，又沒有駕照。他會不會根本沒意識到這麼危險？');
+  await say('4號・工程師','車速和路況是事實。但「故意」要看他知不知道、願不願意。我們只能從法庭上的證據去推論他當時的想法。');
+  let a1; while(true){ a1=await ask('審判長','6 號，你的看法呢？',['是故意，而且能預見可能撞死人','比較像過失，或無法預見死亡結果','我還不確定，可以不表態嗎？']);
+    if(a1!==2)break; await say('審判長','可以慢慢想，也可以先用手機查資料。不過評議時每位國民法官都必須表示意見、參與表決，不需要勉強和別人一樣。（Q3625）'); }
+  await say('3號・家管', a1===0?'我也這樣想。三個家庭就這樣失去家人。':'我理解你的想法。不過他兩次切出車道，我覺得很難說完全沒想到後果。');
+  const v1=[...rnd([[0,1,0,1,1,0,1,1],[1,1,0,1,1,1,0,0],[0,1,1,0,1,1,1,0],[1,1,0,1,1,1,1,0]]).map(Boolean),a1===0];
+  const p1=guiltyCheck(v1); st.votes=v1;
+  await modal(board(v1,'爭點一表決：甲成立起訴罪名？','有罪需 9 人中 6 票以上，且贊成者包含法官與國民法官。',p1));
+  await say('審判長', p1?'達到 6 票，且雙方都有人贊成。甲成立起訴的罪名。':'未達有罪門檻，不能認定甲成立起訴的罪名。（在真實審判中，法院還會討論其他罪名，這裡先略過。）');
+  // issue 2
+  st.votes=null;
+  await say('審判長','爭點二：乙在前車，緊急煞車沒有撞到人。乙要不要和甲一起，對 3 人死亡負責？法律上，兩人以上共同實行犯罪，都算正犯。（刑法第28條）');
+  await say('5號・大學生','乙沒有撞到任何人。要他為甲失控負責，好像太重了。');
+  await say('3號・家管','可是兩台車一前一後一起穿梭、一起切出。如果沒有乙在前面，甲還會這樣開嗎？');
+  await say('4號・工程師','起訴事實寫到兩人一起這樣開。他們之間有沒有一起這樣開的意思，要看法庭上的證據。');
+  const a2=await ask('審判長','6 號，你怎麼看？',['乙也要一起負責','乙不用為死亡結果負責']);
+  const v2=[...rnd([[0,1,0,1,1,0,1,0],[0,1,0,0,1,1,1,1],[1,1,0,1,0,1,1,0],[0,0,0,1,1,0,1,1]]).map(Boolean),a2===0];
+  const p2=guiltyCheck(v2); st.votes=v2;
+  await modal(board(v2,'爭點二表決：乙成立起訴罪名？','有罪需 9 人中 6 票以上，且贊成者包含法官與國民法官。',p2));
+  await say('審判長', p2?'達到門檻，乙也成立起訴的罪名。':(a2===0&&v2.filter(Boolean).length===5?'加上你的票只有 5 票，還差 1 票。':'')+(p2?'':'未達門檻，不能作出對乙不利的認定。'));
+  // issue 3
+  let sentence=null; st.votes=null;
+  if(p1){
+    await say('審判長','爭點三：甲的刑度。這個罪的法定刑是無期徒刑或 7 年以上有期徒刑；無照駕駛還可以加重到二分之一。量刑要考慮動機、手段、違反義務的程度、造成的損害、犯後態度等。（刑法第57條）');
+    await say('2號・退休老師','他還年輕，我會希望刑度能留給他改過的機會。');
+    await say('3號・家管','三個家庭失去家人，我覺得不能判太輕。');
+    const OPTS=['偏重','中間','接近法定最低刑','適用刑法第59條酌減'];
+    const a3=await ask('審判長','6 號，你傾向哪一個？（由重到輕）',OPTS);
+    const npc=rnd([[1,0,2,1,1,1,0,2],[2,0,3,1,2,2,0,1],[3,1,2,2,1,1,0,2],[2,0,1,1,1,2,1,3]]);
+    const all=[...npc,a3];
+    // 由最不利被告的刑度開始累加，直到過半且雙方都有（Q3628）
+    let acc=[]; for(let o=0;o<4;o++){ all.forEach((x,i)=>{if(x===o)acc.push(i)});
+      if(acc.length>=5&&acc.some(i=>SEATS[i][1])&&acc.some(i=>!SEATS[i][1])){sentence=o;break} }
+    await modal(`<h3>爭點三表決：甲的刑度</h3><div class="board">${SEATS.map(([n,j],i)=>`<div class="seat ${j?'j':''} ${i===8?'me':''}"><div class="v" style="font-size:11px">${OPTS[all[i]].slice(0,4)}</div>${n}</div>`).join('')}</div>
+      <p class="tally">${OPTS.map((o,k)=>`${o}：${all.filter(x=>x===k).length} 票`).join('　')}</p>
+      <p class="tally">刑度要過半數（5 票），且包含法官與國民法官。沒有選項單獨過半時，從最重的票開始，依序算入次重的選項，直到過半。（Q3628）<br>結果：<span class="pass">${OPTS[sentence]}</span></p>
+      <p class="fine">其他成員的票是隨機劇本，每次體驗都不一樣，不代表正確答案。</p><button class="btn" data-close="1">繼續</button>`);
+  }
+  st.votes=null;
+  await say('審判長','評議到這裡結束。謝謝大家。提醒你：在真正的審判中，評議過程和每個人的投票都要終身保密。（Q3633）');
+  // 8
+  scene('outside','法院門口',8); hint('可以跟朋友聊這個案子嗎？');
+  SFX.gavel(3);
+  await say('旁白',`宣判了。依你們的評議結果：甲${p1?'成立':'不成立'}起訴罪名${p1?'，刑度採「'+['偏重','中間','接近法定最低刑','適用刑法第59條酌減'][sentence]+'」':''}；乙${p2?'成立':'不成立'}起訴罪名。\n（模擬結果，與真實案件無關。）`);
+  await modal(`<h3>你剛剛走完了一趟國民法官</h3><div class="sub">司法院 113 年度成效評估報告</div><div class="stats">
+    <div class="stat"><div class="big"><s>25.7%</s>69.3%</div><p>覺得「沒有擔心」的比例，擔任前到擔任後</p></div>
+    <div class="stat"><div class="big"><s>21.6%</s>72.7%</div><p>「非常願意」擔任的比例，一般民眾到擔任過的人</p></div></div>
+    <p class="fine">最多人擔心的是聽不懂法律用語、不了解案情。這正是這個體驗想先幫你練習的事。</p><button class="btn" data-close="1">繼續</button>`);
+  const fin=await ask('審判長','體驗完之後，如果真的收到通知，你會願意去嗎？',['會，我會到場','我有狀況，想申請免除','我還在考慮']);
+  await replyModal(fin);
+  await ask('旁白','謝謝你走完這次預演。',['再玩一次']);
+  story();
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function roadStep(ph,cap,fresh){ st.road={ph,from:fresh?ph:st.road.ph,at:performance.now()}; caption(cap); if(ph<5) SFX.engine(ph); else { st.flash=reduce?0:.9; SFX.crash(); } }
+const ROAD_CAPS=['17:30｜雨天、下班尖峰','速限 50｜時速約 60–70','沒打方向燈，切到銀色小客車前方','再回到公車專用道','17:45｜時速 80 以上，再次切出','乙煞停；甲失控撞進騎樓'];
+async function replayRoad(){ for(let i=0;i<6;i++){ await roadStep(i,'重播｜'+ROAD_CAPS[i],i===0); await sleep(i===5?2600:1700); } }
+
+function surveyModal(){
+  const items=['年滿 70 歲以上','具有老師或學生身分','要照顧家人或養育小孩，執行職務有困難','有重大疾病、傷害或身心因素','重大受災戶，需要處理生活重建','5 年內擔任過國民法官','以上都沒有'];
+  return modal(`<h3>參與資格及意願調查表</h3><div class="sub">體驗用簡化版。正式版本以法院寄送的為準</div>
+    <p class="fine">你有沒有以下情形？可以複選。</p>${items.map((t,i)=>`<label><input type="checkbox" id="sv${i}" value="${i}"> ${t}</label>`).join('')}
+    <div class="result" id="svOut">勾選後，這裡會即時顯示初篩結果。</div>
+    <button class="btn" data-close="1">寄回調查表</button>`, doc=>{
+      doc.addEventListener('change',e=>{
+        if(e.target.id==='sv6'&&e.target.checked) doc.querySelectorAll('input').forEach(x=>{if(x.id!=='sv6')x.checked=false});
+        else if(e.target.checked) doc.querySelector('#sv6').checked=false;
+        const on=[...doc.querySelectorAll('input:checked')].map(x=>+x.value);
+        const out=doc.querySelector('#svOut');
+        if(!on.length) out.textContent='勾選後，這裡會即時顯示初篩結果。';
+        else if(on.includes(6)) out.textContent='看起來不符合拒絕事由，原則上應依通知到庭。到庭可領 1,500 元日費和交通費。（Q3607；Q3637）';
+        else out.textContent='可能符合「得拒絕」：'+on.map(i=>items[i]).join('、')+'。請在調查表勾選並說明理由，附上證明文件。是否准許由法院決定。（Q3607；Q3613）';
+      });
+  });
+}
+function oathModal(){
+  return modal(`<h3>宣誓</h3><div class="sub">國民法官在審理前要宣誓，承諾依法公正誠實地執行職務</div>
+    <p style="font-size:14px">宣誓是國民法官的 8 項義務之一，其他還有嚴守秘密、全程到庭、公正獨立、參與評議等。（Q3634）</p>
+    <button class="hold" id="hold"><i></i><span>按住 2 秒宣誓</span></button>`, (doc,close)=>{
+      const b=doc.querySelector('#hold'), bar=b.querySelector('i'); let t0=0, raf;
+      const tick=()=>{const p=Math.min(1,(performance.now()-t0)/2000);bar.style.width=p*100+'%';if(p>=1){b.querySelector('span').textContent='宣誓完成';SFX.chime([523,659,784,1047]);setTimeout(()=>close(),400);return}raf=requestAnimationFrame(tick)};
+      const down=e=>{e.preventDefault();t0=performance.now();raf=requestAnimationFrame(tick)};
+      const up=()=>{cancelAnimationFrame(raf);if(bar.style.width!=='100%')bar.style.width='0'};
+      b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointerleave',up);
+      b.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat)down(e)}); b.addEventListener('keyup',up);
+  });
+}
+function replyModal(fin){
+  const label=['到場','申請免除','尚未決定'][fin];
+  return modal(`<h3>一鍵回覆法院</h3><div class="sub">真實版本：掃描通知書上的 QR code 就能回覆</div>
+    <dl><dt>回覆</dt><dd><b>${label}</b></dd><dt>送出後</dt><dd>${fin===1?'系統會帶你填寫免除說明，並提醒要附的證明文件。':fin===0?'法院會即時看到你的回覆，不必再打電話確認。':'選任期日前，系統會再提醒你一次。'}</dd></dl>
+    <div class="result">法院端的儀表板會即時統計回覆，並預測到場人數，決定還需要寄出多少張通知書。</div>
+    <p class="fine">這是模擬畫面，不會真的送出任何資料。</p><button class="btn" data-close="1">送出（模擬）</button>`);
+}
+
+/* ---------- phone: Q&A ---------- */
+let sampleFn=null, hintQ=null, mode='qa', delibHist=[];
+const ENTRIES=[...KB.matchAll(/^((?:Q36\d\d|A\d{3}))（(.+?)）問：(.+)\n答：([\s\S]*?)\n出處：(.+)$/gm)].map(m=>({id:m[1],cat:m[2],q:m[3],a:m[4].trim(),src:m[5].trim()}));
+const bigr=s=>{s=s.replace(/[\s，。？！、（）「」：；,.?!]/g,'');const o=new Set();for(let i=0;i<s.length-1;i++){const x=s.slice(i,i+2);if(!STOP.has(x))o.add(x)}return o};
+const STOP=new Set(['可以','以在','會不','不會','國民','民法','法官','什麼','怎麼','我的','法院','以帶','可能','一定']);
+ENTRIES.forEach(e=>{e.bq=bigr(e.q+(ALT[e.id]||''));e.ba=bigr(e.a)});
+function localAnswer(q){
+  const b=bigr(q); let best=null,score=0;
+  ENTRIES.forEach(e=>{let s=0;b.forEach(x=>{if(e.bq.has(x))s+=2;else if(e.ba.has(x))s+=.6});s/=Math.max(4,b.size);if(s>score){score=s;best=e}});
+  if(!best||score<.6) return '這個問題目前資料庫沒有收錄，建議直接聯繫通知書上的承辦法院確認。';
+  const a=best.a.length>220?best.a.slice(0,220)+'……':best.a;
+  return `最接近的問題是：「${best.q}」\n\n${a}\n\n出處：${best.src}`;
+}
+const CHIPS=['去一天有多少錢？','可以請公假嗎？','被告會不會來找我？','可以帶寵物嗎？'];
+function renderChips(){
+  const list=mode==='qa'?[...new Set([hintQ,...CHIPS].filter(Boolean))].slice(0,4):['開始','甲有沒有前科？'];
+  $('chips').innerHTML=list.map(t=>`<button class="chip" type="button">${esc(t)}</button>`).join('');
+  $('chips').querySelectorAll('.chip').forEach(c=>c.onclick=()=>send(c.textContent));
+}
+function addMsg(cls,text){const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;$('msgs').appendChild(d);$('msgs').scrollTop=1e9;return d}
+function setMode(m){ mode=m; $('msgs').innerHTML='';
+  if(m==='qa'){ $('phTitle').textContent='國民法官小幫手';
+    $('phMode').textContent=modeLabel();
+    addMsg('bot','嗨，有任何關於國民法官的問題都可以問我。我只根據司法院公開的常見問答回答，並附上出處；資料庫沒有的，我會請你直接問法院。'); }
+  else { $('phTitle').textContent='模擬評議室（AI）'; $('phMode').textContent='AI 扮演審判長與 5 位國民法官，你是 6 號';
+    delibHist=[]; addMsg('bot','歡迎進入評議室。我是審判長，接下來請和其他 5 位國民法官、2 位法官一起討論本案。準備好了就輸入「開始」。'); }
+  renderChips(); }
+function openPhone(){ $('phone').hidden=false; $('badge').hidden=true; $('phInput').focus({preventScroll:true}); }
+function openDelib(){ setMode('delib'); openPhone(); }
+$('phoneBtn').onclick=()=>{ if($('phone').hidden){ if(mode!=='qa'&&!$('msgs').children.length)setMode('qa'); openPhone(); } else $('phone').hidden=true; };
+$('phClose').onclick=()=>{ $('phone').hidden=true; if(mode==='delib') setMode('qa'); };
+$('phForm').onsubmit=e=>{e.preventDefault();const v=$('phInput').value.trim();if(v){$('phInput').value='';send(v)}};
+let busy=false;
+async function send(q){
+  if(busy)return; busy=true; addMsg('me',q);
+  const out=addMsg('bot','……');
+  try{
+    if(mode==='qa'){
+      if(sampleFn){
+        const r=await sampleFn(KB+'\n\n使用者問題：'+q,{cache:false,modelTier:'quick',onText:({text})=>{out.textContent=text}});
+        out.textContent=r.text;
+      } else if(SEM){ out.textContent=await semAnswer(q); }
+      else { await sleep(300); out.textContent=localAnswer(q); }
+    } else {
+      delibHist.push({role:'user',content:q});
+      const msgs=delibHist.map((m,i)=>i===0?{role:'user',content:DELIB+'\n\n使用者：'+m.content}:m);
+      const r=await sampleFn(msgs,{cache:false,onText:({text})=>{out.textContent=text}});
+      out.textContent=r.text; delibHist.push({role:'assistant',content:r.text});
+    }
+  }catch(err){
+    if(mode==='qa'){ out.textContent=localAnswer(q); addMsg('sys','AI 暫時無法使用，改用比對模式回答。'); }
+    else { out.textContent='AI 評議室暫時無法使用，請關閉手機，繼續劇本評議。'; delibHist.pop(); }
+    if(err&&err.code==='not_granted'){ sampleFn=null; setMode('qa'); }
+  }
+  busy=false;
+}
+/* 語意搜尋：在瀏覽器裡跑小型中文向量模型，不需登入或伺服器 */
+let SEM=null, semState='idle';
+const SEM_MODEL='Xenova/bge-small-zh-v1.5';
+function modeLabel(){
+  if(sampleFn) return 'AI 模式：只依司法院常見問答回答，附出處';
+  if(SEM) return '語意搜尋模式：瀏覽器內 AI 模型比對 42 題常見問答，附出處';
+  if(semState==='loading') return 'AI 模型下載中，先用關鍵字比對回答';
+  return '比對模式：從 42 題常見問答找最接近的答案';
+}
+function refreshMode(){ if(mode==='qa') $('phMode').textContent=modeLabel(); }
+async function loadSemantic(){
+  if(sampleFn||semState!=='idle') return;
+  semState='loading'; refreshMode();
+  try{
+    const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2');
+    const ext=await T.pipeline('feature-extraction',SEM_MODEL,{dtype:'q8'});
+    const texts=[]; ENTRIES.forEach(e=>[e.q,...(ALT[e.id]||'').split('｜')].filter(Boolean).forEach(s=>texts.push([e,s])));
+    const items=[];
+    for(let i=0;i<texts.length;i+=16){
+      const part=texts.slice(i,i+16), out=await ext(part.map(x=>x[1]),{pooling:'cls',normalize:true}), dim=out.dims[1];
+      part.forEach(([e],k)=>items.push({e,v:out.data.slice(k*dim,(k+1)*dim)}));
+    }
+    SEM={ext,items}; semState='ready';
+  }catch(err){ console.warn('語意搜尋無法載入，改用關鍵字比對',err); semState='failed'; }
+  refreshMode();
+}
+async function semAnswer(q){
+  const out=await SEM.ext(q,{pooling:'cls',normalize:true}), v=out.data, best=new Map();
+  SEM.items.forEach(({e,v:w})=>{ let s=0; for(let i=0;i<v.length;i++) s+=v[i]*w[i]; if(s>(best.get(e)||0)) best.set(e,s); });
+  const top=[...best].sort((a,b)=>b[1]-a[1]);
+  const [e,s]=top[0];
+  if(s<0.6) return '這個問題目前資料庫沒有收錄，建議直接聯繫通知書上的承辦法院確認。';
+  const a=e.a.length>220?e.a.slice(0,220)+'……':e.a;
+  let txt=`最接近的問題是：「${e.q}」\n\n${a}\n\n出處：${e.src}`;
+  if(s<0.72) txt=`我不太確定你問的是不是這題，請參考：\n\n`+txt+`\n\n其他可能相關：「${top[1][0].q}」`;
+  return txt;
+}
+setMode('qa');
+(async()=>{ try{ const c=window.claude; if(c&&c.use){ sampleFn=await c.use('sample'); if(sampleFn&&mode==='qa'&&$('msgs').children.length<=1) setMode('qa'); } }catch(e){}
+  if(!sampleFn) loadSemantic(); })();
+
+story();
+</script>
+
+</body>
+</html>
