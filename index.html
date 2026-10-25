@@ -71,6 +71,13 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .doc .btn:focus-visible{outline:3px solid var(--brass)}
 .doc .fine{font-size:12px;color:#7a6a55}
 .doc label{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:14px;cursor:pointer}
+.doc .field{display:block;font-size:14px;margin:10px 0 4px;font-weight:700}
+.doc input[type=text],.doc textarea{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:6px 8px;border:2px solid var(--paper-ink);background:#fff;color:var(--paper-ink)}
+.doc .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.doc .btn.alt{background:#9a8b74}
+.doc a.btn{display:inline-block;text-decoration:none}
+.doc .warn{color:var(--stamp);font-size:13px}
+.practice{display:inline-block;background:var(--stamp);color:#fff;font-size:11px;padding:0 6px;margin-left:6px;vertical-align:middle}
 .doc .result{background:#efe4c8;padding:8px 10px;margin:10px 0;font-size:14px}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
 .card{border:2px solid var(--paper-ink);padding:10px;background:#fff;font-size:13px}
@@ -420,8 +427,14 @@ function guiltyCheck(v){ const y=v.map((x,i)=>x?i:-1).filter(i=>i>=0);
 
 /* ---------- the story ---------- */
 const S={};
+let started=false;
 async function story(){
   st.votes=null; st.road={ph:0,from:0,at:0};
+  if(!started){ started=true; scene('home','你家客廳',1);
+    const how=await modal(`<h3>這次換你判</h3><div class="sub">國民法官 AI 預演室（非官方競賽原型）</div>
+      <p style="font-size:14px">收到國民法官的通知了嗎？你可以先花 10 分鐘走一遍從選任到評議的過程，也可以直接回覆法院。遊戲裡的選擇都是練習，不會送出。</p>
+      <div class="row"><button class="btn" data-close="play">先體驗（約 10 分鐘）</button><button class="btn alt" data-close="reply">直接正式回覆法院</button></div>`);
+    if(how==='reply'){ await realReply(); await say('旁白','回覆完成。想了解當國民法官會經歷什麼，可以繼續往下體驗。'); } }
   // 1
   scene('home','你家客廳',1); hint('去一天有多少錢？');
   await say('旁白','某天下午，你在信箱裡發現一封法院寄來的信。');
@@ -536,7 +549,8 @@ async function story(){
     <div class="stat"><div class="big"><s>21.6%</s>72.7%</div><p>「非常願意」擔任的比例，一般民眾到擔任過的人</p></div></div>
     <p class="fine">最多人擔心的是聽不懂法律用語、不了解案情。這正是這個體驗想先幫你練習的事。</p><button class="btn" data-close="1">繼續</button>`);
   const fin=await ask('審判長','體驗完之後，如果真的收到通知，你會願意去嗎？',['會，我會到場','我有狀況，想申請免除','我還在考慮']);
-  await replyModal(fin);
+  const go=await ask('旁白','提醒你：剛剛遊戲裡的所有選擇都是練習，不會送到法院。如果你真的收到通知，要現在正式回覆嗎？',['正式回覆法院','先不用']);
+  if(go===0) await realReply();
   await ask('旁白','謝謝你走完這次預演。',['再玩一次']);
   story();
 }
@@ -547,7 +561,7 @@ async function replayRoad(){ for(let i=0;i<6;i++){ await roadStep(i,'重播｜'+
 
 function surveyModal(){
   const items=['年滿 70 歲以上','具有老師或學生身分','要照顧家人或養育小孩，執行職務有困難','有重大疾病、傷害或身心因素','重大受災戶，需要處理生活重建','5 年內擔任過國民法官','以上都沒有'];
-  return modal(`<h3>參與資格及意願調查表</h3><div class="sub">體驗用簡化版。正式版本以法院寄送的為準</div>
+  return modal(`<h3>參與資格及意願調查表</h3><div class="sub">體驗用簡化版<span class="practice">練習用，不會送出</span></div>
     <p class="fine">你有沒有以下情形？可以複選。</p>${items.map((t,i)=>`<label><input type="checkbox" id="sv${i}" value="${i}"> ${t}</label>`).join('')}
     <div class="result" id="svOut">勾選後，這裡會即時顯示初篩結果。</div>
     <button class="btn" data-close="1">寄回調查表</button>`, doc=>{
@@ -572,6 +586,39 @@ function oathModal(){
       const up=()=>{cancelAnimationFrame(raf);if(bar.style.width!=='100%')bar.style.width='0'};
       b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up); b.addEventListener('pointerleave',up);
       b.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat)down(e)}); b.addEventListener('keyup',up);
+  });
+}
+/* 正式回覆：和遊戲分開，要填通知書上的編號並再次確認才會送出 */
+const FORM={url:'',id:'',reply:'',reasons:'',note:''}; // 填入 Google 表單「預先填入連結」的代號
+const REASONS=['年滿 70 歲以上','具有老師或學生身分','要照顧家人或養育小孩，執行職務有困難','有重大疾病、傷害或身心因素','重大受災戶，需要處理生活重建','5 年內擔任過國民法官','其他（請在說明欄寫明）'];
+function realReply(){
+  return modal(`<h3>正式回覆法院</h3><div class="sub">請依照通知書上的資料填寫，這裡的回覆才會送到法院</div>
+    <label class="field" for="rpId">候選人編號（印在通知書上）</label><input type="text" id="rpId" placeholder="例如 C023" autocomplete="off">
+    <span class="field">你的回覆</span>
+    ${['我會到場','我要申請免除','還在考慮，請再提醒我'].map((x,i)=>`<label><input type="radio" name="rp" id="rp${i}" value="${i}"> ${x}</label>`).join('')}
+    <div id="rpEx" hidden><span class="field">申請免除的事由（可複選）</span>
+      ${REASONS.map((x,i)=>`<label><input type="checkbox" id="rr${i}" value="${i}"> ${x}</label>`).join('')}
+      <label class="field" for="rpNote">說明</label><textarea id="rpNote" rows="3" placeholder="請具體說明，例如：就讀○○大學三年級，附學生證影本"></textarea>
+      <p class="fine">是否准許由法院決定。法院可能會請你補交證明文件。</p></div>
+    <p class="warn" id="rpErr" hidden></p>
+    <div class="row"><button class="btn" id="rpNext">下一步：確認內容</button><button class="btn alt" data-close="0">取消</button></div>`,(doc,close)=>{
+      const $d=s=>doc.querySelector(s);
+      doc.addEventListener('change',()=>{ $d('#rpEx').hidden=!$d('#rp1').checked; });
+      $d('#rpNext').onclick=()=>{
+        const id=$d('#rpId').value.trim(), r=doc.querySelector('input[name=rp]:checked');
+        const rs=[...doc.querySelectorAll('#rpEx input:checked')].map(x=>REASONS[+x.value]), note=$d('#rpNote').value.trim();
+        const err=!id?'請填寫通知書上的候選人編號。':!r?'請選擇你的回覆。':(r.value==='1'&&!rs.length)?'申請免除請至少勾選一個事由。':(r.value==='1'&&!note)?'申請免除請寫一段說明，法院才能判斷。':'';
+        if(err){ $d('#rpErr').textContent=err; $d('#rpErr').hidden=false; return; }
+        const label=['我會到場','我要申請免除','還在考慮'][+r.value];
+        let link='';
+        if(FORM.url){ const p=new URLSearchParams({usp:'pp_url'}); p.set(FORM.id,id); p.set(FORM.reply,label); if(rs.length)p.set(FORM.reasons,rs.join('、')); if(note)p.set(FORM.note,note); link=FORM.url+'?'+p; }
+        doc.innerHTML=`<h3>確認送出</h3><div class="sub">送出後法院會收到以下內容</div>
+          <dl><dt>候選人編號</dt><dd>${esc(id)}</dd><dt>回覆</dt><dd><b>${label}</b></dd>${rs.length?`<dt>事由</dt><dd>${esc(rs.join('、'))}</dd>`:''}${note?`<dt>說明</dt><dd>${esc(note)}</dd>`:''}</dl>
+          <div class="result">法院端的儀表板會即時統計回覆、預測到場人數；免除申請會先由 AI 整理，再由法官決定。</div>
+          <div class="row">${link?`<a class="btn" id="rpSend" href="${esc(link)}" target="_blank" rel="noopener">確定送出（開啟法院回覆表單）</a>`:`<button class="btn" id="rpSend">確定送出（原型：表單尚未連結）</button>`}<button class="btn alt" data-close="0">取消</button></div>`;
+        doc.querySelector('[data-close]').onclick=()=>close('0');
+        $d('#rpSend').addEventListener('click',()=>{ SFX.chime([523,659,784]); setTimeout(()=>close('1'),300); });
+      };
   });
 }
 function replyModal(fin){
