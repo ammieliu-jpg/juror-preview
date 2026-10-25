@@ -589,29 +589,33 @@ function oathModal(){
   });
 }
 /* 正式回覆：和遊戲分開，要填通知書上的編號並再次確認才會送出 */
-const FORM={url:'',id:'',reply:'',reasons:'',note:''}; // 填入 Google 表單「預先填入連結」的代號
-const REASONS=['年滿 70 歲以上','具有老師或學生身分','要照顧家人或養育小孩，執行職務有困難','有重大疾病、傷害或身心因素','重大受災戶，需要處理生活重建','5 年內擔任過國民法官','其他（請在說明欄寫明）'];
+const FORM={url:'https://docs.google.com/forms/d/e/1FAIpQLSe3PPB_zPOpHZhpuS3HWQG38fQp3KDoHWHSf30XxvKTyTq3GQ/viewform',id:'entry.1612295714',reply:'entry.1258938889',reasons:'',note:''}; // 填入 Google 表單「預先填入連結」的代號
+// 文字要和 Google 表單第 3 題的核取方塊選項完全一樣
+const REASONS=['年滿 70 歲以上','具有老師或學生身分','要照顧家人或養育小孩，執行職務有困難','有重大疾病、傷害或身心因素','重大受災戶，需要處理生活重建','5 年內擔任過國民法官','職業或身分不能擔任（如法官、檢察官、律師、警察、軍人）','其他（請在說明欄寫明）'];
+const REASON_EG=['例如：民國 44 年次，今年 71 歲。（附身分證影本）','例如：就讀○○大學法律系三年級，平日要上課。（附學生證影本）','例如：要照顧中風臥床的父親，家裡沒有其他人可以幫忙。（附診斷證明）','例如：上個月剛做心臟手術，醫師要求休養三個月。（附診斷證明）','例如：家裡在○月水災全毀，正在處理重建。（附受災證明）','例如：民國 113 年曾在○○地院擔任國民法官。','例如：在○○分局擔任警察。（附服務證明）','例如：請寫出你的狀況，以及為什麼無法到場。'];
 function realReply(){
   return modal(`<h3>正式回覆法院</h3><div class="sub">請依照通知書上的資料填寫，這裡的回覆才會送到法院</div>
     <label class="field" for="rpId">候選人編號（印在通知書上）</label><input type="text" id="rpId" placeholder="例如 C023" autocomplete="off">
     <span class="field">你的回覆</span>
     ${['我會到場','我要申請免除','還在考慮，請再提醒我'].map((x,i)=>`<label><input type="radio" name="rp" id="rp${i}" value="${i}"> ${x}</label>`).join('')}
-    <div id="rpEx" hidden><span class="field">申請免除的事由（可複選）</span>
+    <div id="rpEx" hidden><span class="field">免除事由類別（可複選）</span><p class="fine">請選擇符合的法定事由。</p>
       ${REASONS.map((x,i)=>`<label><input type="checkbox" id="rr${i}" value="${i}"> ${x}</label>`).join('')}
-      <label class="field" for="rpNote">說明</label><textarea id="rpNote" rows="3" placeholder="請具體說明，例如：就讀○○大學三年級，附學生證影本"></textarea>
+      <label class="field" for="rpNote">具體情況說明</label><p class="fine">用自己的話寫出你的狀況，法官會依這段判斷。記得準備證明文件。</p><textarea id="rpNote" rows="4" placeholder="先勾選上面的事由，這裡會出現填寫範例。"></textarea>
       <p class="fine">是否准許由法院決定。法院可能會請你補交證明文件。</p></div>
     <p class="warn" id="rpErr" hidden></p>
     <div class="row"><button class="btn" id="rpNext">下一步：確認內容</button><button class="btn alt" data-close="0">取消</button></div>`,(doc,close)=>{
       const $d=s=>doc.querySelector(s);
-      doc.addEventListener('change',()=>{ $d('#rpEx').hidden=!$d('#rp1').checked; });
+      doc.addEventListener('change',()=>{ $d('#rpEx').hidden=!$d('#rp1').checked;
+        const on=[...doc.querySelectorAll('#rpEx input:checked')].map(x=>+x.value);
+        $d('#rpNote').placeholder=on.length?on.map(i=>REASON_EG[i]).join('\n'):'先勾選上面的事由，這裡會出現填寫範例。'; });
       $d('#rpNext').onclick=()=>{
         const id=$d('#rpId').value.trim(), r=doc.querySelector('input[name=rp]:checked');
         const rs=[...doc.querySelectorAll('#rpEx input:checked')].map(x=>REASONS[+x.value]), note=$d('#rpNote').value.trim();
         const err=!id?'請填寫通知書上的候選人編號。':!r?'請選擇你的回覆。':(r.value==='1'&&!rs.length)?'申請免除請至少勾選一個事由。':(r.value==='1'&&!note)?'申請免除請寫一段說明，法院才能判斷。':'';
         if(err){ $d('#rpErr').textContent=err; $d('#rpErr').hidden=false; return; }
-        const label=['我會到場','我要申請免除','還在考慮'][+r.value];
+        const label=['到場','申請免除','尚未決定'][+r.value]; // 要和 Google 表單的選項文字完全一樣
         let link='';
-        if(FORM.url){ const p=new URLSearchParams({usp:'pp_url'}); p.set(FORM.id,id); p.set(FORM.reply,label); if(rs.length)p.set(FORM.reasons,rs.join('、')); if(note)p.set(FORM.note,note); link=FORM.url+'?'+p; }
+        if(FORM.url){ const p=new URLSearchParams({usp:'pp_url'}); p.set(FORM.id,id); p.set(FORM.reply,label); if(FORM.reasons) rs.forEach(x=>p.append(FORM.reasons,x)); if(note&&FORM.note)p.set(FORM.note,note); link=FORM.url+'?'+p; }
         doc.innerHTML=`<h3>確認送出</h3><div class="sub">送出後法院會收到以下內容</div>
           <dl><dt>候選人編號</dt><dd>${esc(id)}</dd><dt>回覆</dt><dd><b>${label}</b></dd>${rs.length?`<dt>事由</dt><dd>${esc(rs.join('、'))}</dd>`:''}${note?`<dt>說明</dt><dd>${esc(note)}</dd>`:''}</dl>
           <div class="result">法院端的儀表板會即時統計回覆、預測到場人數；免除申請會先由 AI 整理，再由法官決定。</div>
