@@ -623,7 +623,8 @@ async function send(q){
       if(sampleFn){
         const r=await sampleFn(KB+'\n\n使用者問題：'+q,{cache:false,modelTier:'quick',onText:({text})=>{out.textContent=text}});
         out.textContent=r.text;
-      } else if(SEM){ out.textContent=await semAnswer(q); }
+      } else if(chatReply(q)){ await sleep(200); out.textContent=chatReply(q); }
+      else if(SEM){ out.textContent=await semAnswer(q); }
       else { await sleep(300); out.textContent=localAnswer(q); }
     } else {
       delibHist.push({role:'user',content:q});
@@ -664,6 +665,13 @@ async function loadSemantic(){
   }catch(err){ console.warn('語意搜尋無法載入，改用關鍵字比對',err); semState='failed'; }
   refreshMode();
 }
+// 打招呼、問身分這類閒聊，不拿去比對資料庫
+const CHAT=[
+  [/^(你是誰|你是什麼|你是ai嗎|你是機器人嗎|介紹一下你自己|你可以做什麼|你會什麼)/i,'我是國民法官小幫手，一個在你瀏覽器裡執行的 AI 問答工具。我只根據司法院國民法官專區的常見問答回答，並附上出處；資料庫沒有的問題，我會請你直接問法院。你可以試試問：「去一天有多少錢？」'],
+  [/^(你好|哈囉|嗨|hi|hello|安安)/i,'你好！有任何關於國民法官的問題都可以問我，例如：「可以請公假嗎？」「被告會不會來找我？」'],
+  [/^(謝謝|感謝|thanks|thank you|3q)/i,'不客氣！還有其他問題隨時問我。'],
+];
+function chatReply(q){ const s=q.trim().replace(/[？?！!。.～~]+$/,''); for(const [re,a] of CHAT) if(re.test(s)) return a; return null; }
 async function semAnswer(q){
   const out=await SEM.ext(q,{pooling:'cls',normalize:true}), v=out.data, best=new Map();
   SEM.items.forEach(({e,v:w})=>{ let s=0; for(let i=0;i<v.length;i++) s+=v[i]*w[i]; if(s>(best.get(e)||0)) best.set(e,s); });
