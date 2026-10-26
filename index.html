@@ -171,7 +171,7 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
   </header>
   <div class="msgs" id="msgs"></div>
   <div class="chips" id="chips"></div>
-  <a class="more" href="" id="moreAi" target="_blank" rel="noopener">🤖 更多 AI 工具：專屬導覽、免除初篩 ↗</a>
+  <a class="more" href="" id="moreAi" target="_blank" rel="noopener">🤖 更多 AI 工具：專屬導覽、免除初篩（PartyRock，需登入）↗</a>
   <form id="phForm"><input id="phInput" autocomplete="off" placeholder="輸入你的問題"><button type="submit">送出</button></form>
 </div>
 
@@ -505,7 +505,7 @@ async function story(){
   { const m=await ask('審判長','你想怎麼進行？',['照劇本進行三個爭點',{t:'🤖 和 AI 法官自由討論',ai:true}]);
     if(m===1){
       if(sampleFn){ openDelib(); await say('旁白','AI 評議室已在右下角的手機打開。討論完回到這裡，我們再照劇本走一次投票。'); }
-      else await modal(`<h3>和 AI 法官自由討論</h3><div class="sub">另開 PartyRock，由 AI 扮演審判長和其他 5 位國民法官</div>
+      else await modal(`<h3>和 AI 法官自由討論</h3><div class="sub">另開 PartyRock（需登入），由 AI 扮演審判長和其他 5 位國民法官</div>
         <p style="font-size:14px">打開後找到「模擬評議室」，輸入「開始」。AI 只會依照本案起訴的事實討論，不會自己編新證據。討論完回到這個分頁，我們再照劇本走一次投票。</p>
         <div class="row"><a class="btn" href="${PARTYROCK}" target="_blank" rel="noopener">開啟 AI 評議室 ↗</a><button class="btn alt" data-close="1">回到遊戲</button></div>`); } }
   // issue 1
@@ -561,7 +561,7 @@ async function story(){
     <p class="fine">最多人擔心的是聽不懂法律用語、不了解案情。這正是這個體驗想先幫你練習的事。</p><button class="btn" data-close="1">繼續</button>`);
   const fin=await ask('審判長','體驗完之後，如果真的收到通知，你會願意去嗎？',['會，我會到場','我有狀況，想申請免除','我還在考慮']);
   await modal(`<h3>${fin===1?'先看看你符不符合免除':fin===2?'還有顧慮嗎？':'出發前，做一份你的專屬準備'}</h3><div class="sub">AI 依你的狀況整理重點，只引用司法院常見問答</div>
-    <a class="aicta" href="${PARTYROCK}" target="_blank" rel="noopener">🤖 ${fin===1?'讓 AI 幫我初篩免除事由並寫好說明':fin===2?'告訴 AI 你在擔心什麼，幫你逐一解答':'讓 AI 幫我做到庭準備清單（交通、請假、補助）'} ↗<small>另開 PartyRock，用白話描述你的狀況就好</small></a>
+    <a class="aicta" href="${PARTYROCK}" target="_blank" rel="noopener">🤖 ${fin===1?'讓 AI 幫我初篩免除事由並寫好說明':fin===2?'告訴 AI 你在擔心什麼，幫你逐一解答':'讓 AI 幫我做到庭準備清單（交通、請假、補助）'} ↗<small>另開 PartyRock（需登入），用白話描述你的狀況就好</small></a>
     <button class="btn alt" data-close="1">先不用，繼續</button>`);
   const go=await ask('旁白','提醒你：剛剛遊戲裡的所有選擇都是練習，不會送到法院。如果你真的收到通知，要現在正式回覆嗎？',['正式回覆法院','先不用']);
   if(go===0) await replyFlow();
@@ -578,7 +578,7 @@ function surveyModal(){
   return modal(`<h3>參與資格及意願調查表</h3><div class="sub">體驗用簡化版<span class="practice">練習用，不會送出</span></div>
     <p class="fine">你有沒有以下情形？可以複選。</p>${items.map((t,i)=>`<label><input type="checkbox" id="sv${i}" value="${i}"> ${t}</label>`).join('')}
     <div class="result" id="svOut">勾選後，這裡會即時顯示初篩結果。</div>
-    <a class="aicta" id="svAi" href="${PARTYROCK}" target="_blank" rel="noopener">🤖 不確定自己符不符合？讓 AI 幫你初篩並寫好說明 ↗<small>另開 PartyRock，用白話描述你的狀況就好</small></a>
+    <a class="aicta" id="svAi" href="${PARTYROCK}" target="_blank" rel="noopener">🤖 不確定自己符不符合？讓 AI 幫你初篩並寫好說明 ↗<small>另開 PartyRock（需登入），用白話描述你的狀況就好</small></a>
     <button class="btn" data-close="1">寄回調查表</button>`, doc=>{
       doc.addEventListener('change',e=>{
         if(e.target.id==='sv6'&&e.target.checked) doc.querySelectorAll('input').forEach(x=>{if(x.id!=='sv6')x.checked=false});
@@ -679,7 +679,7 @@ function renderChips(){
   $('chips').querySelectorAll('.chip').forEach(c=>c.onclick=()=>send(c.textContent));
 }
 // 資料庫答不了、或牽涉個人狀況時，把 PartyRock 的 AI 導覽直接放在回答下面
-function addAiCta(){const a=document.createElement('a');a.className='aicta';a.href=PARTYROCK;a.target='_blank';a.rel='noopener';a.innerHTML='🤖 你的狀況比較特別？讓 AI 依你的情況回答 ↗<small>另開 PartyRock</small>';$('msgs').appendChild(a);$('msgs').scrollTop=1e9}
+function addAiCta(){const a=document.createElement('a');a.className='aicta';a.href=PARTYROCK;a.target='_blank';a.rel='noopener';a.innerHTML='🤖 你的狀況比較特別？讓 AI 依你的情況回答 ↗<small>另開 PartyRock（需登入）</small>';$('msgs').appendChild(a);$('msgs').scrollTop=1e9}
 function addMsg(cls,text){const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;$('msgs').appendChild(d);$('msgs').scrollTop=1e9;return d}
 function setMode(m){ mode=m; $('msgs').innerHTML='';
   if(m==='qa'){ $('phTitle').textContent='國民法官小幫手';
