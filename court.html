@@ -41,6 +41,10 @@ details.panel summary{cursor:pointer;font-weight:700}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
 .kpi b{display:block;font-size:28px;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi b small{font-size:18px;color:var(--mute)}
+.who{display:inline-block;font-size:11px;font-weight:700;padding:0 6px;border-radius:3px;color:#fff;background:var(--mute)}
+.who.rule{background:var(--ok)}
+.who.ai{background:var(--accent)}
 .kpi span{font-size:13px;color:var(--mute)}
 .kpi.warn b{color:var(--warn)}
 .tbl{overflow-x:auto}
@@ -64,7 +68,7 @@ tr.new td{animation:flash 2s ease-out}
 <body>
 <div class="wrap">
 <header>
-  <h1>法院端儀表板<small>國民法官選任回覆・免除申請 AI 初篩</small></h1>
+  <h1>法院端儀表板<small>國民法官選任回覆・免除申請初篩（規則＋AI）</small></h1>
   <span class="tag">模擬資料・非官方競賽原型</span>
 </header>
 
@@ -87,7 +91,7 @@ tr.new td{animation:flash 2s ease-out}
     <label>模型名稱
       <input id="model" value="gemini-2.5-flash"></label>
     <div><button class="primary" id="save">儲存並載入</button> <button id="clearCache">清除 AI 分類快取</button></div>
-    <p class="fine">沒有金鑰也能看儀表板，免除申請會改用「規則比對」（非 AI）。示範時請只用虛構資料：免費版 Gemini 的資料可能被 Google 用來改進模型。</p>
+    <p class="fine">沒有金鑰也能用：規則判得了的照常分類，其餘標「待 AI」請人工審閱。示範時請只用虛構資料：免費版 Gemini 的資料可能被 Google 用來改進模型。</p>
   </div>
 </details>
 
@@ -96,10 +100,10 @@ tr.new td{animation:flash 2s ease-out}
 <section class="panel">
   <h2>待審免除申請</h2>
   <div class="tbl"><table>
-    <thead><tr><th>編號</th><th>勾選事由</th><th>民眾說明</th><th>AI 對應事由</th><th>類型</th><th>AI 建議</th><th>人工確認</th><th>書記官待辦</th></tr></thead>
+    <thead><tr><th>編號</th><th>勾選事由</th><th>民眾說明</th><th>對應事由</th><th>類型</th><th>初篩結果</th><th>人工確認</th><th>書記官待辦</th></tr></thead>
     <tbody id="rows"><tr><td colspan="8" class="empty">尚未載入資料</td></tr></tbody>
   </table></div>
-  <p class="fine">AI 只做初步整理，是否准許由法官決定。事由依國民法官法第 12～16 條、司法院常見問答 Q3606、Q3607。</p>
+  <p class="fine">先用規則判（年齡、在學、法定職業、曾任國民法官，不花 token），需要判斷「重大」或說法模糊的才交給 AI。只做初步整理，是否准許由法官決定。事由依國民法官法第 13～16 條、司法院常見問答 Q3606、Q3607。</p>
 </section>
 
 <section class="panel">
@@ -110,29 +114,31 @@ tr.new td{animation:flash 2s ease-out}
 </div>
 
 <script>
-const RULES = `你是地方法院處理國民法官選任的書記官助理。民眾寄回調查表並申請免除，請對照事由清單分類，幫書記官先整理，最後由法官決定。
+// 交給 AI 的只有「規則判不了」的申請。事由依國民法官法第 13～16 條。
+const RULES = `你是地方法院處理國民法官選任的書記官助理。民眾寄回調查表並申請免除，規則程式判斷不了，才交給你。請對照事由清單分類，幫書記官先整理，最後由法官決定。
 
 【事由清單】
-不得擔任（國民法官法第12至15條；司法院常見問答 Q3606）：
-・自身因素：現涉刑案未滿一定期間或被褫奪公權者
-・身心因素：受法院監護或輔助宣告
-・教育門檻：未完成國民教育者
-・案件有關：與本案或本案被告、被害人有一定關係者
-・不能公平：有事證難以公平審判者
-・職業因素：具法、政、軍、警等特殊職業背景者
+不得擔任（國民法官法第13～15條；司法院常見問答 Q3606）：
+・第13條 自身因素：褫奪公權、受監護或輔助宣告、刑案起訴中或判刑未滿一定期間、破產未復權等
+・第14條 職業因素：總統副總統、政務人員與民意代表、政黨黨務人員、現役軍人、警察、法官、檢察官、律師、公設辯護人、司法院與法務部所屬公務員、司法警察、教授主要法律科目者、未完成國民義務教育者等
+・第15條 案件有關：本案被害人、被告或被害人的親屬或同居人、證人、告訴人、參與偵查審判者，或有具體事證足認難以公平審判者
 得拒絕（國民法官法第16條；Q3607）：
 ・年滿七十歲以上
-・重大受災戶有處理生活重建事務必要
-・具有老師、學生身分
-・曾於5年內擔任過國民法官、備位國民法官
-・因重大疾病、傷害、身心因素而無法執行職務
-・因看護、養育親屬或生活、工作、家庭有重大需要，執行職務顯有困難
+・公立或已立案私立學校的教師、在校學生
+・有重大疾病、傷害、生理或心理因素，執行職務顯有困難
+・執行職務有致生重大損害的危險
+・因看護、養育親屬致執行職務顯有困難
+・重大災害受災，須處理生活重建事務
+・因生活、工作、家庭有重大需要，致執行職務顯有困難
+・曾於5年內擔任國民法官、備位國民法官
+・曾於1年內被通知到庭為候選國民法官
 
 【規則】
-1. 只能依照事由清單判斷，不可以自己新增事由，也不可以把清單沒有的職業（例如保全、攤販）當成「職業因素」。
-2. 民眾勾選的事由只是參考，要以「具體情況說明」為準；說明太模糊、沒有具體病名或狀況時，判「資料不足」。
-3. 下列情況「需人工確認」一律為「是」：資料不足、看起來不符合、職業因素邊界不明、申請人表示其實可以到場、需要證明但沒提到附件。
-4. 只寫「可能符合」，不可以寫「准許」或「駁回」，那是法官的決定。
+1. 只能依照事由清單判斷，不可以自己新增事由。清單沒有的職業（例如保全、攤販、國防部文職人員）不能直接當成職業因素，要寫「需人工確認：是」並請書記官確認。
+2. 「重大」要有具體內容：疾病要有病名或治療（手術、住院、化療等）；看護要說明照顧誰、為什麼只有他能照顧。只說「身體不好」「很忙」「收入會少」判「資料不足」或「看起來不符合」。
+3. 民眾勾選的事由只是參考，以「具體情況說明」為準。
+4. 下列情況「需人工確認」一律為「是」：資料不足、看起來不符合、職業邊界不明、申請人表示其實可以到場、需要證明但沒提到附件。
+5. 只寫「可能符合」，不可以寫「准許」或「駁回」，那是法官的決定。
 
 【輸出】只輸出一個 JSON 物件，不要有其他文字：
 {"對應事由":"清單中的那一條，都不符合寫「無」","類型":"不得擔任｜得拒絕｜無","AI建議":"可能符合｜資料不足｜看起來不符合","需人工確認":"是｜否","理由":"一句話，30 字內","書記官待辦":"例如：請補診斷證明／請電話確認職務內容／可直接送法官"}`;
@@ -208,10 +214,11 @@ async function load(fromDemo){
 
 function render(){
   const ex=rows.filter(isEx), go=rows.filter(r=>String(r[2]).includes('到場')), und=rows.filter(r=>String(r[2]).includes('未決定'));
-  const done=ex.filter(r=>cache[keyOf(r)]), chk=done.filter(r=>cache[keyOf(r)]['需人工確認']==='是');
+  const done=ex.filter(r=>cache[keyOf(r)]&&cache[keyOf(r)].src!=='pending'), chk=ex.filter(r=>cache[keyOf(r)]?.['需人工確認']==='是');
+  const byRule=done.filter(r=>cache[keyOf(r)].src==='rule').length, byAI=done.length-byRule;
   $('kpis').innerHTML=[
     [rows.length,'已回覆人數'],[go.length,'回覆會到場'],[ex.length,'申請免除'],[und.length,'尚未決定'],
-    [ex.length?`${done.length}/${ex.length}`:'0','AI 已初篩'],[chk.length,'需書記官確認','warn']
+    [`${byRule}<small> / ${byAI}</small>`,'規則判 / AI 判'],[chk.length,'需書記官確認','warn']
   ].map(([v,l,c])=>`<div class="kpi ${c||''}"><b>${v}</b><span>${l}</span></div>`).join('');
   if(!ex.length){ $('rows').innerHTML='<tr><td colspan="8" class="empty">目前沒有免除申請</td></tr>'; return; }
   // 第一次載入不標示；之後新進來的申請閃一下
@@ -220,8 +227,8 @@ function render(){
     const k=keyOf(r), c=cache[k], fresh=prev&&!prev.has(k);
     const adv=c?c['AI建議']:'', cls=adv==='可能符合'?'ok':adv==='資料不足'?'warn':adv?'bad':'';
     return `<tr class="${fresh?'new':''}"><td class="id">${esc(r[1])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td>
-      <td>${c?esc(c['對應事由']):'<span class="status">AI 分類中…</span>'}</td><td>${c?esc(c['類型']):''}</td>
-      <td>${c?`<span class="badge ${cls}">${esc(adv)}</span><div class="src">${c.src==='rule'?'規則比對':'AI'}・${esc(c['理由'])}</div>`:''}</td>
+      <td>${c?esc(c['對應事由']):'<span class="status">分類中…</span>'}</td><td>${c?esc(c['類型']):''}</td>
+      <td>${c?`<span class="who ${c.src}">${c.src==='rule'?'規則判':c.src==='ai'?'AI 判':'待 AI'}</span> <span class="badge ${cls}">${esc(adv)}</span><div class="src">${esc(c['理由'])}${c['依據']?'<br>'+esc(c['依據']):''}</div>`:''}</td>
       <td>${c?(c['需人工確認']==='是'?'<span class="check">是</span>':'否'):''}</td><td>${c?esc(c['書記官待辦']):''}</td></tr>`;
   }).join('');
 }
@@ -239,29 +246,52 @@ async function gemini(prompt,json=true){
   throw new Error('超過免費額度，稍後再試');
 }
 
-// 沒有金鑰或 AI 失敗時的備案：只用關鍵字，結果一律請人工確認
+/* 第一層：規則。只處理「看條文就能判」的情況（年齡、在學、法定職業、曾任國民法官），
+   不花任何 token；說明有模糊、反悔或需要判斷「重大」的，回傳 null 交給 AI。 */
+const ROC_YEAR=new Date().getFullYear()-1911;
 function ruleClassify(r){
-  const s=r[3]+' '+r[4]; const age=+(s.match(/(\d{2,3})\s*歲/)||[])[1];
-  const pick=(reason,type)=>({'對應事由':reason,'類型':type,'AI建議':'可能符合','需人工確認':'是','理由':'關鍵字比對，請人工確認','書記官待辦':'請人工審閱說明與證明文件',src:'rule'});
-  if(age>=70) return pick('年滿七十歲以上','得拒絕');
-  if(/學生|老師|教師/.test(s)) return pick('具有老師、學生身分','得拒絕');
-  if(/手術|疾病|重病|住院/.test(s)) return pick('因重大疾病、傷害、身心因素而無法執行職務','得拒絕');
-  if(/照顧|看護|小孩/.test(s)) return pick('因看護、養育親屬或生活、工作、家庭有重大需要，執行職務顯有困難','得拒絕');
-  return {'對應事由':'無','類型':'無','AI建議':'資料不足','需人工確認':'是','理由':'關鍵字比對無法判斷','書記官待辦':'請人工審閱',src:'rule'};
+  const s=String(r[4]||''), box=String(r[3]||'');
+  if(!s.trim()) return null;
+  if(/其實可以|可以去|只是想問|不想去|好像|應該是|不確定|大概/.test(s)) return null;
+  const res=(reason,type,law,why,proof,todo)=>({'對應事由':reason,'類型':type,'AI建議':'可能符合','需人工確認':proof?'否':'是','理由':why,'書記官待辦':proof?'可直接送法官':todo,'依據':law,src:'rule'});
+  // 年齡：寫明歲數，或民國年次換算
+  let age=+(s.match(/(\d{2,3})\s*歲/)||[])[1]||0, how=age?`自述 ${age} 歲`:'';
+  let y=+(s.match(/民國\s*(\d{2,3})\s*年次/)||s.match(/(\d{2,3})\s*年次/)||[])[1];
+  if(!age&&y){ age=ROC_YEAR-y; how=`民國 ${y} 年次，約 ${age} 歲`; }
+  if(/已滿\s*(七十|70)\s*歲/.test(s)&&age<=70){ age=70; how='自述已滿 70 歲'; y=0; }
+  if(age){
+    if(age>=71||(age===70&&!y)) return res('年滿七十歲以上','得拒絕','國民法官法第16條',how+'，≥ 70',/身分證|戶口|戶籍/.test(s),'請補身分證明');
+    if(age<70&&box.includes('70')) return {'對應事由':'無','類型':'無','AI建議':'看起來不符合','需人工確認':'是','理由':how+'，未滿 70','書記官待辦':'請確認年齡','依據':'國民法官法第16條',src:'rule'};
+    if(age===70) return null; // 年次換算可能差一歲，交給 AI 並請人工確認
+  }
+  // 在學、在職教師（補習班、家教不算學校）
+  if(!/補習|家教|安親/.test(s)&&/(大學|研究所|學院|高中|高職|國中|國小|學校|學系).{0,10}(學生|老師|教師|年級)|就讀|在學|學生證|教師證/.test(s))
+    return res('公立或已立案私立學校的教師、在校學生','得拒絕','國民法官法第16條','說明寫明就讀／任教學校',/學生證|教師證|在學證明|在職證明|服務證明/.test(s),'請補學生證或在職證明');
+  // 第 14 條列舉的職業（排除家人、助理、退休等）
+  if(!/助理|事務所|保全|退役|退伍|退休|以前|家人|先生|太太|丈夫|妻子|爸|媽|兒子|女兒|朋友/.test(s)){
+    const m=s.match(/現役軍人|軍人|警察|檢察官|法官|律師|公設辯護人|司法警察/)||s.match(/(地檢署|法院|司法院|法務部).{0,8}(書記官|職員|公務員|上班|任職)/);
+    if(m) return res('第14條職業因素：'+m[0],'不得擔任','國民法官法第14條','職業屬條文列舉',/服務證明|在職證明|服務證/.test(s),'請補服務證明');
+  }
+  // 5 年內當過國民法官：法院查得到紀錄
+  if(/(擔任過|當過|曾任).{0,4}(備位)?國民法官/.test(s))
+    return {'對應事由':'曾於5年內擔任國民法官、備位國民法官','類型':'得拒絕','AI建議':'可能符合','需人工確認':'是','理由':'自述曾任國民法官','書記官待辦':'請調閱選任紀錄確認年份','依據':'國民法官法第16條',src:'rule'};
+  return null;
 }
+const pendingAI=()=>({'對應事由':'—','類型':'—','AI建議':'待 AI 判斷','需人工確認':'是','理由':'需判斷「重大」或邊界情況，規則無法判斷','書記官待辦':'請人工審閱（未設定 AI 金鑰）',src:'pending'});
 
 async function classifyAll(){
   if(running) return; running=true;
   try{
     for(const r of rows.filter(isEx)){
-      const k=keyOf(r); if(cache[k]&&!(cfg.apiKey&&cache[k].src==='rule')) continue; // 有金鑰後，規則比對的結果改由 AI 重新分類
-      let out;
+      const k=keyOf(r); if(cache[k]&&!(cfg.apiKey&&cache[k].src==='pending')) continue; // 補上金鑰後，等 AI 的申請再送一次
+      let out=ruleClassify(r);
+      if(out){ cache[k]=out; render(); continue; }
       if(cfg.apiKey){
         try{
           const t=await gemini(RULES+`\n\n【待審申請】\n候選人編號：${r[1]}\n勾選的事由：${r[3]||'未勾選'}\n具體情況說明：${r[4]||'未填寫'}`);
           out=JSON.parse((t.match(/\{[\s\S]*\}/)||['{}'])[0]); out.src='ai';
-        }catch(err){ $('status').textContent='AI 失敗，改用規則比對：'+err.message; out=ruleClassify(r); out.temp=true; }
-      } else out=ruleClassify(r);
+        }catch(err){ $('status').textContent='AI 失敗：'+err.message; out=pendingAI(); out['書記官待辦']='請人工審閱（AI 暫時無法使用）'; }
+      } else out=pendingAI();
       cache[k]=out; if(out.src==='ai') store.set('cache',cache); render();
       if(cfg.apiKey) await new Promise(r=>setTimeout(r,1200));
     }
