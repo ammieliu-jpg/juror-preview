@@ -616,6 +616,7 @@ async function replyFlow(){
   while(true){
     const r=await realReply();
     if(r==='1'){ await say('旁白','法院的回覆表單已經在新分頁打開，內容都幫你填好了。記得在表單最下面按「提交」，才算回覆完成。'); return true; }
+    if(r==='2'){ await say('旁白','法院的回覆表單已經在新分頁打開，編號和事由都幫你填好了。說明已經複製，請貼在最後一題，再按表單最下面的「提交」，才算回覆完成。'); return true; }
     const again=await ask('旁白','你取消了回覆，沒有送出任何資料。',['重新填寫','先不用']);
     if(again===1) return false;
   }
@@ -642,14 +643,17 @@ function realReply(){
         if(err){ $d('#rpErr').textContent=err; $d('#rpErr').hidden=false; return; }
         const label=['到場','申請免除','尚未決定'][+r.value]; // 要和 Google 表單的選項文字完全一樣
         let link='';
-        if(FORM.url){ const p=new URLSearchParams({usp:'pp_url'}); p.set(FORM.id,id); p.set(FORM.reply,label); if(FORM.reasons) rs.forEach(x=>p.append(FORM.reasons,x)); if(note&&FORM.note)p.set(FORM.note,note); link=FORM.url+'?'+p; }
+        if(FORM.url){ const p=new URLSearchParams({usp:'pp_url'}); p.set(FORM.id,id); p.set(FORM.reply,label); if(FORM.reasons) rs.forEach(x=>p.append(FORM.reasons,x)); link=FORM.url+'?'+p; } // 說明可能含病名等健康資料（個資法第 6 條），不放進網址，避免留在瀏覽紀錄與伺服器紀錄
         const s2=$d('#rpS2'); $d('#rpS1').hidden=true; s2.hidden=false;
         s2.innerHTML=`<h3>確認送出</h3><div class="sub">送出後法院會收到以下內容</div>
           <dl><dt>候選人編號</dt><dd>${esc(id)}</dd><dt>回覆</dt><dd><b>${label}</b></dd>${rs.length?`<dt>事由</dt><dd>${esc(rs.join('、'))}</dd>`:''}${note?`<dt>說明</dt><dd>${esc(note)}</dd>`:''}</dl>
+          ${note&&link?`<p class="warn">為了保護你的健康等個人資料，說明不會放進網址。按「確定送出」時會自動複製說明，請在表單最後一題「具體情況說明」貼上。</p><div class="row"><button class="btn alt" type="button" id="rpCopy">先複製說明</button></div>`:''}
           <div class="result">法院端的儀表板會即時統計回覆、預測到場人數；免除申請會先由 AI 整理，再由法官決定。</div>
           <div class="row">${link?`<a class="btn" id="rpSend" href="${esc(link)}" target="_blank" rel="noopener">確定送出（開啟法院回覆表單）</a>`:`<button class="btn" id="rpSend">確定送出（原型：表單尚未連結）</button>`}<button class="btn alt" id="rpBack">返回修改</button></div>`;
         $d('#rpBack').onclick=()=>{ s2.hidden=true; $d('#rpS1').hidden=false; $d('#rpErr').hidden=true; };
-        $d('#rpSend').addEventListener('click',()=>{ SFX.chime([523,659,784]); setTimeout(()=>close('1'),300); });
+        const copyNote=()=>{ try{ return navigator.clipboard.writeText(note).then(()=>true,()=>false) }catch(e){ return Promise.resolve(false) } };
+        if($d('#rpCopy')) $d('#rpCopy').onclick=async()=>{ $d('#rpCopy').textContent=(await copyNote())?'已複製 ✓':'複製失敗，請手動選取上面的說明'; };
+        $d('#rpSend').addEventListener('click',()=>{ if(note&&link) copyNote(); SFX.chime([523,659,784]); setTimeout(()=>close(note&&link?'2':'1'),300); });
       };
   });
 }
