@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
-test('apps-script/Code.gs 和 lib/screening.js + apps-script/main.gs 同步', () => {
+test('apps-script/Code.gs、PublicAI.gs 和原始碼同步', () => {
   assert.doesNotThrow(() => execFileSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'build-gs.mjs'), '--check'], { stdio: 'pipe' }));
 });
 

@@ -19,7 +19,7 @@ flowchart LR
   end
 
   subgraph "GitHub Pages（靜態網站）"
-    GH["index.html · court.html · court.js<br/>lib/screening.js · lib/qa-search.js"]
+    GH["index.html · court.html · court.js<br/>lib/screening.js · lib/qa-search.js · lib/self-help.js"]
   end
 
   subgraph "第三方（只下載，不傳個資）"
@@ -40,14 +40,19 @@ flowchart LR
     C["court.html<br/>法院端儀表板"]
   end
 
-  PR["PartyRock<br/>模組 2、3、5、6"]
+  subgraph "Google（獨立的 Apps Script 專案）"
+    PX["民眾端 AI 代理<br/>apps-script/PublicAI.gs<br/>限流・注入防護・預設關閉"]
+  end
+
+  PR["PartyRock<br/>模組 1、2、3、5、6<br/>（只給評審看）"]
 
   GH -->|載入| G
   GH -->|載入| C
   P -.->|首次使用下載| CDN
   P -.->|首次使用下載| HF
   G -->|試填一次：開啟預填網址| F
-  G -.->|個人狀況：另開| PR
+  P -.->|"AI 自由評議（只送對虛構案件說的話）"| PX
+  PX -.-> GM
   F --> SH
   SH -->|提交表單時觸發| AS
   AS -->|規則判不了的| GM
@@ -61,12 +66,14 @@ flowchart LR
 |---|---|---|---|
 | 民眾端遊戲 | `index.html` | 民眾的瀏覽器 | 否。遊戲選擇不會送出 |
 | 問答小幫手 | `index.html` + `lib/qa-search.js` | 民眾的瀏覽器（語意模型也在瀏覽器裡跑） | 否。問題不離開瀏覽器 |
+| 免除初篩、專屬準備清單（模組 3、2） | `index.html` + `lib/self-help.js` + `lib/screening.js` | 民眾的瀏覽器 | 民眾自己輸入，**不離開瀏覽器** |
+| AI 自由評議（模組 5） | `apps-script/PublicAI.gs` | 獨立的 Google Apps Script → Gemini | 否。只談虛構案件；預設關閉 |
 | 示範表單 | Google 表單 | Google | 是（只能用虛構資料） |
 | 自動分類 | `apps-script/Code.gs`（= `apps-script/main.gs` + `lib/screening.js`） | Google Apps Script | 是 |
 | AI 模型 | Gemini API（原型）／TAIDE（正式版） | Google／法院自建 | 是（只送規則判不了的那幾筆） |
 | 法院端儀表板 | `court.html` + `court.js` + `lib/screening.js` | 書記官的瀏覽器 | 是 |
 | 統計圖表 | Looker Studio | Google | 統計數字為主 |
-| AI 工具箱 | PartyRock（模組 2、3、5、6） | AWS PartyRock | 民眾自己輸入 |
+| AI 工具箱（評審展示用） | PartyRock（模組 1、2、3、5、6） | AWS PartyRock | 不放在民眾端（要登入） |
 
 ---
 
@@ -159,11 +166,45 @@ flowchart TD
   C -->|是| C1["bge-small-zh 向量相似度<br/>＋ 0.08 × 關鍵字分數<br/>&lt; 0.6 沒有收錄；&lt; 0.72 加「不太確定」"]
   C -->|"否（下載中或失敗）"| D1["雙字詞重疊比對<br/>題目 2 分、答案 0.6 分"]
   C1 & D1 & B1 --> E{"牽涉個人狀況？<br/>免除、我是…、沒有收錄"}
-  E -->|是| F["附上 PartyRock AI 導覽連結"]
+  E -->|是| F["附上免登入小工具：免除初篩、專屬準備清單"]
   E -->|否| G["顯示答案與出處"]
 ```
 
 資料庫：41 題司法院國民法官常見問答（Q3601–Q3641）＋ 20 題補充（A001–A020），內嵌在 `index.html` 的 `KB`；口語問法在 `ALT`、`MORE_ALT`。
+
+---
+
+## 4-1. 民眾不用登入：每個 AI 功能在哪裡跑
+
+以前民眾端的模組 2、3、5 都要另開 PartyRock，而 PartyRock 要先登入 AWS 帳號，收到通知的民眾不會為了這個去註冊。現在依「會不會碰到個資」分兩種做法：
+
+| 功能 | 做法 | 為什麼 |
+|---|---|---|
+| 問答小幫手（模組 1） | 瀏覽器內語意搜尋（已經是這樣） | 只回資料庫原文，不會幻覺 |
+| 免除初篩＋說明草稿（模組 3） | 瀏覽器內：`Screening.ruleClassify`（和法院端同一套規則）＋ `SelfHelp.checkSituation` 關鍵字分類（第 16 條第 4、6、7、8、10 款） | 民眾會寫病名、家人狀況（個資法第 6 條的敏感資料），不送到任何伺服器；草稿只把民眾自己寫的內容套進固定格式 |
+| 專屬準備清單（模組 2） | 瀏覽器內：選身分、勾擔心的事 → `SelfHelp.buildGuide` 挑出常見問答原文 | 只引用原文，不產生新文字 |
+| AI 自由評議（模組 5） | `apps-script/PublicAI.gs` 代理 Gemini；`index.html` 的 `AI_PROXY` 空白時不顯示 | 真的需要生成式 AI；只談虛構案件，不碰個資 |
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor 民眾
+  participant G as index.html（手機）
+  participant PX as PublicAI.gs（獨立 Apps Script）
+  participant AI as Gemini
+  G->>PX: GET（遊戲載入時）
+  PX-->>G: {"on":true}（PUBLIC_AI=on 且有金鑰）
+  民眾->>G: 第 7 關選「和 AI 法官自由討論」，輸入一句話
+  G->>PX: POST text/plain {"kind":"delib","sid":隨機代號,"text":"…"}
+  PX->>PX: 檢查格式、≤300 字、疑似指令文字 → 固定回覆
+  PX->>PX: 全站限流（每分鐘、每天）、每場 ≤16 回合
+  PX->>AI: systemInstruction＝伺服器端的評議提示詞<br/>contents＝伺服器快取裡的前文＋這一句
+  AI-->>PX: 回覆
+  PX-->>G: {"reply":"…","left":剩餘回合}
+  Note over G,PX: 代理關閉、額度用完或出錯 → 遊戲照劇本評議
+```
+
+設計重點：金鑰只在指令碼屬性；提示詞和對話紀錄都在伺服器端，民眾只能送「自己說的一句話」，所以不能把它變成任人使用的免費 AI，也不能偽造 AI 說過的話。代理放在**獨立**的 Apps Script 專案，碰不到法院端試算表。
 
 ---
 
@@ -216,12 +257,15 @@ juror-preview/
 ├── court.js                法院端：程式
 ├── lib/
 │   ├── screening.js        免除初篩（court.html 與 Apps Script 共用）
-│   └── qa-search.js        問答比對
+│   ├── qa-search.js        問答比對
+│   └── self-help.js        民眾端免除初篩、專屬準備清單（取代 PartyRock 模組 2、3）
 ├── apps-script/
-│   ├── main.gs             Apps Script 原始碼
-│   └── Code.gs             自動產生，貼進 Apps Script 的就是這個
+│   ├── main.gs             法院端 Apps Script 原始碼（模組 6）
+│   ├── Code.gs             自動產生，貼進法院端 Apps Script 的就是這個
+│   ├── public-ai.gs        民眾端 AI 代理原始碼（模組 5 自由評議）
+│   └── PublicAI.gs         自動產生，貼進「另一個獨立」Apps Script 專案
 ├── prompts/                PartyRock 提示詞（模組 2、3、5、6）
-├── scripts/build-gs.mjs    產生 Code.gs
+├── scripts/build-gs.mjs    產生 Code.gs、PublicAI.gs
 ├── tests/                  單元測試、標註資料、準確度評估
 └── docs/                   說明文件（本資料夾）
 ```
@@ -235,6 +279,7 @@ juror-preview/
 | `index.html`、`court.html`、`court.js`、`lib/*` | 合併到 `main` 後 GitHub Pages 自動更新（約 1 分鐘） |
 | `lib/screening.js` 或 `apps-script/main.gs` | `npm run build:gs` → 把 `apps-script/Code.gs` 全部貼進 Apps Script → 儲存。若有用網頁應用程式：「部署 → 管理部署作業 → 編輯 → 新版本」 |
 | `RULES_PROMPT`（事由清單或規則） | 同上，另外手動同步 `prompts/` 和 PartyRock 模組 3、6 |
+| 評議提示詞（`index.html` 的 `DELIB`） | `npm run build:gs` → 把 `apps-script/PublicAI.gs` 貼進民眾端 AI 代理 → 部署新版本；同步 PartyRock 模組 5 |
 | 問答資料庫（`KB`） | 改 `index.html`，同步 `prompts/PartyRock問答提示詞.txt` 與 PartyRock，跑 `npm test` |
 
 詳細設定步驟見 [SETUP.md](SETUP.md)；欄位格式見 [DATA_SCHEMA.md](DATA_SCHEMA.md)。

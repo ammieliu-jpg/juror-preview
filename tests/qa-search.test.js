@@ -57,7 +57,7 @@ test('hybridAnswer：語意分數不夠高時加上「不太確定」', () => {
   assert.equal(Q.hybridAnswer(entries, new Map([[a, 0.3]]), '隨便'), Q.NOT_FOUND);
 });
 
-test('needsPersonalHelp：個人狀況要附 AI 導覽連結', () => {
+test('needsPersonalHelp：個人狀況要附免除初篩、準備清單', () => {
   assert.ok(Q.needsPersonalHelp('我是老師可以不去嗎', ''));
   assert.ok(!Q.needsPersonalHelp('去一天多少錢', '日費 1,500 元'));
 });

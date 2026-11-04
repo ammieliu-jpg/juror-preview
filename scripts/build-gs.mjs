@@ -1,4 +1,6 @@
-// 把 lib/screening.js 和 apps-script/main.gs 合併成 apps-script/Code.gs（貼進 Apps Script 的就是這個檔）。
+// 產生要貼進 Apps Script 的兩個檔案：
+//   apps-script/Code.gs      = apps-script/main.gs + lib/screening.js（法院端，模組 6）
+//   apps-script/PublicAI.gs  = apps-script/public-ai.gs + index.html 的 DELIB 評議提示詞 + 注入防護（民眾端，模組 5）
 // 用法：npm run build:gs　　檢查是否同步：node scripts/build-gs.mjs --check
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -18,12 +20,33 @@ ${main}
  * 以下為 lib/screening.js（和 court.html 共用的初篩邏輯）
  * ====================================================================== */
 ${lib}`;
-const target = join(root, 'apps-script/Code.gs');
+// 民眾端 AI 代理：評議提示詞以 index.html 的 DELIB 為唯一來源，注入防護沿用 lib/screening.js 的 INJECT
+const html = readFileSync(join(root, 'index.html'), 'utf8');
+const delib = html.match(/^const DELIB = (".*");$/m);
+if (!delib) { console.error('index.html 找不到 const DELIB'); process.exit(1); }
+const inject = lib.match(/var INJECT = (\/.*\/[a-z]*);/);
+if (!inject) { console.error('lib/screening.js 找不到 INJECT'); process.exit(1); }
+const pub = `// ⚠ 自動產生的檔案，請勿手動修改。來源：apps-script/public-ai.gs + index.html 的 DELIB + lib/screening.js 的 INJECT（npm run build:gs）
+// 使用方式：開一個新的獨立 Apps Script 專案 → 貼上本檔全部內容 → 儲存 → 部署成網頁應用程式（見 docs/SETUP.md）。
+
+${readFileSync(join(root, 'apps-script/public-ai.gs'), 'utf8')}
+/* ======================================================================
+ * 以下自動產生：評議提示詞（index.html 的 DELIB）與疑似指令文字（lib/screening.js 的 INJECT）
+ * ====================================================================== */
+const DELIB_PROMPT = ${delib[1]};
+const PUBLIC_INJECT = ${inject[1]};
+`;
+
+const outputs = [[join(root, 'apps-script/Code.gs'), out], [join(root, 'apps-script/PublicAI.gs'), pub]];
 if (process.argv.includes('--check')) {
-  const cur = (() => { try { return readFileSync(target, 'utf8'); } catch { return ''; } })();
-  if (cur !== out) { console.error('apps-script/Code.gs 和原始碼不同步，請執行 npm run build:gs'); process.exit(1); }
-  console.log('apps-script/Code.gs 已同步');
+  let ok = true;
+  for (const [target, text] of outputs) {
+    const cur = (() => { try { return readFileSync(target, 'utf8'); } catch { return ''; } })();
+    if (cur !== text) { console.error(`${target.replace(root + '/', '')} 和原始碼不同步，請執行 npm run build:gs`); ok = false; }
+  }
+  if (!ok) process.exit(1);
+  console.log('apps-script/Code.gs、PublicAI.gs 已同步');
 } else {
-  writeFileSync(target, out);
-  console.log('已產生 apps-script/Code.gs');
+  for (const [target, text] of outputs) writeFileSync(target, text);
+  console.log('已產生 apps-script/Code.gs、apps-script/PublicAI.gs');
 }
