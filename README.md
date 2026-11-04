@@ -47,7 +47,7 @@ docs/                   說明文件
 
 | 文件 | 內容 |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架構圖：全貌、一筆回覆的旅程、初篩流程、問答流程、信任邊界、程式結構、部署 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架構圖：全貌、一筆回覆的旅程、初篩流程、問答流程、信任邊界、程式結構、部署、導入路徑（哪些是示範外殼、哪些能帶走） |
 | [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) | 安全與架構審查：所有發現與處理狀態 |
 | [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md) | 表單、試算表、模組 4、Looker Studio、court.html 的欄位對照 |
 | [docs/SETUP.md](docs/SETUP.md) | Gemini 金鑰、Apps Script、網頁應用程式、儀表板、Looker Studio 設定步驟 |

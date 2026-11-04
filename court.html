@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- 內容安全政策：只能執行本站的程式；只能連到 Google 試算表、Apps Script 與 Gemini。
-     就算民眾的說明夾帶 HTML 或程式碼，也無法載入外部程式或把金鑰送到別的網站。 -->
+<!-- 內容安全政策：只能執行本站的程式（script-src 'self'），民眾說明裡夾帶的 HTML 或程式碼不會被執行。
+     connect-src 只允許 Google 試算表、Apps Script 與 Gemini；但這些是任何人都能架自己服務的網域
+     （自己的 Apps Script、自己的 Google 表單），所以它擋不住「程式已經被注入之後」把資料送出去。
+     真正的防線是 esc() 跳脫＋script-src 'self'，讓程式根本注入不進來。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://docs.google.com https://script.google.com https://*.googleusercontent.com https://generativelanguage.googleapis.com; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>法院端儀表板</title>
@@ -25,6 +27,7 @@
   --accent:#7ea2f0; --ok:#5fc48a; --warn:#e7a04c; --bad:#ec7a70; --chip:#2c2935; color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#17161c;--panel:#211f28;--line:#36333f;--ink:#ece8f2;--mute:#a09aae;--accent:#7ea2f0;--ok:#5fc48a;--warn:#e7a04c;--bad:#ec7a70;--chip:#2c2935;color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important} /* .form 的 display:grid 會蓋過 hidden，資料來源沒選到的欄位也會顯示 */
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.55}
 .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
 header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:16px}
@@ -68,8 +71,11 @@ tr.new td{animation:flash 2s ease-out}
 .badge.bad{color:var(--bad);border:1px solid var(--bad)}
 .check{color:var(--warn);font-weight:700}
 .src{font-size:11px;color:var(--mute)}
+label.doc{display:flex;gap:4px;align-items:center;margin-top:4px;font-size:12px;color:var(--warn);cursor:pointer;white-space:nowrap}
+label.doc.done{color:var(--ok)}
 #summary{white-space:pre-wrap;margin:0}
 .empty{color:var(--mute);padding:20px 0;text-align:center}
+.warnbox{border-color:var(--warn);color:var(--warn);font-size:14px}
 @media (prefers-reduced-motion:reduce){tr.new td{animation:none}}
 </style>
 </head>
@@ -87,6 +93,8 @@ tr.new td{animation:flash 2s ease-out}
   <span class="status" id="status">尚未載入資料</span>
 </div>
 
+<p class="panel warnbox" id="verWarn" role="alert" hidden></p>
+
 <details class="panel" id="settings">
   <summary>設定（資料來源、AI 金鑰）</summary>
   <div class="form">
@@ -98,7 +106,7 @@ tr.new td{animation:flash 2s ease-out}
     <div data-source="webapp" class="form">
       <label>網頁應用程式網址（部署後拿到的 …/exec）
         <input id="webappUrl" placeholder="https://script.google.com/macros/s/……/exec" autocomplete="off"></label>
-      <label>存取碼（Apps Script 指令碼屬性 DASHBOARD_TOKEN）
+      <label>存取碼（Apps Script 指令碼屬性 DASHBOARD_TOKEN；只存在這個分頁，關掉就要重新輸入）
         <input id="token" type="password" autocomplete="off"></label>
       <p class="fine">分類由 Apps Script 在 Google 那一端完成，這一頁不需要 Gemini 金鑰。</p>
     </div>
@@ -127,13 +135,13 @@ tr.new td{animation:flash 2s ease-out}
     <thead><tr><th>編號</th><th>勾選事由</th><th>民眾說明</th><th>對應事由</th><th>類型</th><th>初篩結果</th><th>人工確認</th><th>書記官待辦</th></tr></thead>
     <tbody id="rows"><tr><td colspan="8" class="empty">尚未載入資料</td></tr></tbody>
   </table></div>
-  <p class="fine">先用規則判（年齡、在學、法定職業、曾任國民法官，不花 token），需要判斷「重大」或說法模糊的才交給 AI。只做初步整理，是否准許由法官決定。事由依國民法官法第 13～16 條、司法院常見問答 Q3606、Q3607。</p>
+  <p class="fine">先用規則判（本人寫明的年齡、在學、法定職業、曾任國民法官，不花 token），提到家人、需要判斷「重大」或說法模糊的才交給 AI。民眾寫的附件只是自述：「核對附件後送法官」要等你看過實際文件、打勾才算完成。只做初步整理，是否准許由法官決定。事由依國民法官法第 13～16 條、司法院常見問答 Q3606、Q3607。</p>
 </section>
 
 <section class="panel">
   <h2>書記官摘要</h2>
   <div class="bar" style="margin-bottom:8px"><button id="sumBtn">產生今日摘要</button></div>
-  <p id="summary" class="status">分類完成後，按上面的按鈕產生。</p>
+  <p id="summary" class="status">由程式統計筆數與編號，不使用 AI，也不會把申請內容送出去。</p>
 </section>
 </div>
 

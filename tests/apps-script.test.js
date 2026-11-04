@@ -51,15 +51,17 @@ function makeEnv({ rows = [], props = {}, llm = [], extraSheets = {} } = {}) {
   };
   const menu = { addItem: () => menu, addSeparator: () => menu, addToUi: () => {} };
   const env = {
-    toasts: [], llmCalls: [], ss,
+    toasts: [], llmCalls: [], heldDuringFetch: [], lockHeld: false, ss,
     SpreadsheetApp: { getActive: () => ss, getUi: () => ({ alert: () => {}, createMenu: () => menu }) },
     Utilities: { formatDate: () => '2026-11-04 10:00', sleep: () => {} },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in props ? props[k] : null) }) },
-    LockService: { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) },
+    // 記錄鎖的狀態：呼叫 Gemini 時不可以鎖著（不然同時送出的人會拿不到鎖）
+    LockService: { getScriptLock: () => ({ waitLock: () => { env.lockHeld = true; }, releaseLock: () => { env.lockHeld = false; } }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: s => ({ body: s, setMimeType() { return this; } }) },
     UrlFetchApp: {
       fetch: (url, opt) => {
         env.llmCalls.push(JSON.parse(opt.payload).contents[0].parts[0].text);
+        env.heldDuringFetch.push(env.lockHeld);
         const next = llm.length ? llm.shift() : { code: 500, body: {} };
         return { getResponseCode: () => next.code, getContentText: () => JSON.stringify(next.body) };
       },
@@ -90,6 +92,7 @@ test('規則判得了的申請：不呼叫 Gemini，標「規則」', () => {
   assert.equal(ai['AI 對應事由'], '年滿七十歲以上');
   assert.equal(ai['判斷來源'], '規則');
   assert.equal(ai['需人工確認'], '否');
+  assert.equal(ai['書記官待辦'], '核對身分證明後送法官', '附件只是自述，不能寫「可直接送法官」');
 });
 
 test('AI 回傳公式時，寫進試算表前要變成純文字（防公式注入）', () => {
@@ -163,4 +166,92 @@ test('rebuildDashboard：輸出模組 4 格式，名冊上沒回覆的標「未�
   const fc = env.ss.getSheetByName('到場預測').data;
   assert.equal(fc[9][0], '預測到場人數');
   assert.match(fc[9][1], /^=ROUND/);
+});
+
+test('writeSummary：由程式統計，不呼叫 Gemini；同一人送出多次以最後一次為準', () => {
+  const env = makeEnv({
+    rows: [
+      ['t1', 'C055', '申請免除', '年滿 70 歲以上', '我今年 72 歲。（附身分證影本）'],
+      ['t2', 'C046', '申請免除', '有重大疾病、傷害或身心因素', '身體不好。'],
+      ['t3', 'C090', '申請免除', '要照顧家人或養育小孩，執行職務有困難', '要照顧小孩。'],
+      ['t4', 'C090', '到場', '', ''], // 撤回免除申請
+    ],
+    props: { GEMINI_API_KEY: 'k' },
+  });
+  env.classifyPending(); // 假 Gemini 一直回 500 → C046 待人工
+  const calls = env.llmCalls.length;
+  env.writeSummary();
+  assert.equal(env.llmCalls.length, calls, '產生摘要不可以呼叫 Gemini');
+  const text = env.ss.getSheetByName('書記官摘要').data[0][1];
+  assert.match(text, /^共 2 筆免除申請/, 'C090 已改成到場，不算');
+  assert.match(text, /C046：尚未分類/);
+  assert.match(text, /核對附件後可送法官（1 筆）：C055/);
+});
+
+const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '書記官待辦', 'AI 處理時間', '判斷來源', '規則版本'];
+const needsAI = ['t', 'C023', '申請免除', '有重大疾病、傷害或身心因素', '上個月剛做完心臟手術。（附診斷證明）'];
+const aiSaysOk = geminiSays({ '對應事由': '第16條第4款', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否', '理由': '心臟手術', '書記官待辦': '可直接送法官' });
+
+test('呼叫 Gemini 時不鎖；寫入時才鎖', () => {
+  const env = makeEnv({ rows: [needsAI], props: { GEMINI_API_KEY: 'k' }, llm: [aiSaysOk] });
+  submit(env, 2);
+  assert.deepEqual(env.heldDuringFetch, [false]);
+  assert.equal(env.lockHeld, false, '結束後要釋放');
+  assert.equal(aiOf(env, 2)['判斷來源'], 'AI');
+  assert.equal(aiOf(env, 2)['書記官待辦'], '核對附件（診斷證明）後送法官');
+});
+
+test('編號不在通知名冊：不送 AI，要人工確認', () => {
+  const env = makeEnv({ rows: [needsAI], props: { GEMINI_API_KEY: 'k' }, llm: [aiSaysOk],
+    extraSheets: { '通知名冊': [['候選人編號', '案號', '通知寄出日'], ['C001', '案A', '2026/11/02']] } });
+  submit(env, 2);
+  assert.equal(env.llmCalls.length, 0);
+  assert.equal(aiOf(env, 2)['需人工確認'], '是');
+  assert.equal(aiOf(env, 2)['書記官待辦'], '候選人編號不在通知名冊，請核對');
+});
+
+test('編號格式異常、規則又判不了：不送 AI', () => {
+  const env = makeEnv({ rows: [['t', '王小明', '申請免除', '有重大疾病', '身體不好。']], props: { GEMINI_API_KEY: 'k' }, llm: [aiSaysOk] });
+  submit(env, 2);
+  assert.equal(env.llmCalls.length, 0);
+  assert.match(aiOf(env, 2)['書記官待辦'], /編號格式異常/);
+});
+
+test('同一人後來又送出：舊的那筆不分類、不送 AI', () => {
+  const env = makeEnv({ rows: [needsAI, ['t2', 'C023', '到場', '', '']], props: { GEMINI_API_KEY: 'k' }, llm: [aiSaysOk] });
+  env.classifyPending();
+  assert.equal(env.llmCalls.length, 0);
+  assert.match(aiOf(env, 2)['AI 建議'], /同一人後來又送出/);
+  assert.equal(aiOf(env, 2)['判斷來源'], '');
+});
+
+test('規則改版後：舊版規則判的列會用新規則重判，AI 判的不重跑', () => {
+  const env = makeEnv({ rows: [], props: { GEMINI_API_KEY: 'k' },
+    llm: [geminiSays({ '對應事由': '第16條第6款', '類型': '得拒絕', 'AI建議': '資料不足', '需人工確認': '是', '理由': '未說明為何只能由本人照顧', '書記官待辦': '請說明照顧需求' })] });
+  env.sheet.data[0] = HEAD.concat(AI_COLS);
+  // 舊版規則把「家母 85 歲」當成申請人自己的年齡
+  env.sheet.data.push(['t1', 'C101', '申請免除', '要照顧家人或養育小孩，執行職務有困難', '我要照顧家母，她 85 歲了。（附戶口名簿影本）',
+    '年滿七十歲以上', '得拒絕', '可能符合', '否', '自述 85 歲，≥ 70', '可直接送法官', '2026-11-01 10:00', '規則', '']);
+  // AI 判的：不因規則改版重跑（不花 token）
+  env.sheet.data.push(['t2', 'C102', '申請免除', '有重大疾病、傷害或身心因素', '身體不好。',
+    '無', '無', '資料不足', '是', '沒有具體病名', '請補診斷證明', '2026-11-01 10:00', 'AI', '2026-11-04']);
+  env.classifyPending();
+  assert.equal(env.llmCalls.length, 1, '只有 C101 改交 AI');
+  assert.match(env.llmCalls[0], /C101/);
+  const a = aiOf(env, 2);
+  assert.equal(a['判斷來源'], 'AI');
+  assert.equal(a['AI 建議'], '資料不足');
+  assert.equal(a['規則版本'], require('../lib/screening.js').RULES_VERSION);
+  assert.equal(aiOf(env, 3)['AI 理由'], '沒有具體病名', 'AI 判的列不變');
+  assert.match(env.toasts[0], /1 筆是舊版規則判的/);
+});
+
+test('到場預測：選任所需人數可用 NEEDED_PER_CASE 設定，多個案號會提醒是合計', () => {
+  const env = makeEnv({ rows: [['t1', 'C001', '到場', '', '']], props: { NEEDED_PER_CASE: '40' },
+    extraSheets: { '通知名冊': [['候選人編號', '案號', '通知寄出日'], ['C001', '案A', '2026/11/02'], ['C002', '案B', '2026/11/02']] } });
+  env.rebuildDashboard();
+  const fc = env.ss.getSheetByName('到場預測').data;
+  assert.equal(fc[10][0], '選任所需人數（假設）');
+  assert.equal(fc[10][1], 40);
+  assert.match(fc[1][2], /2 個案號.*合計/);
 });
