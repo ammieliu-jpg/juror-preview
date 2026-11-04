@@ -1,5 +1,25 @@
 # 修改紀錄
 
+## 2026-11-04　第二輪審查：規則層改白名單、存取碼、摘要
+
+詳見 [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) 第四節。
+
+**正確性**
+- 規則層改成白名單：要看到「我今年 72 歲」「我是警察」「就讀○○大學」這種本人寫法才判。「家母 85 歲」「男友是軍人」「在警察局當清潔工」「退休的老師」「社區大學」都改交 AI＋人工
+- 新增 19 筆標註案例（15 筆邊界說法、4 筆本人寫法），共 44 筆。同一份資料上：舊版規則判 24 筆、錯 12 筆、誤放行 11 筆；新版判 13 筆、錯 0 筆
+- 不再寫「可直接送法官」：附件只是民眾自述，改成「核對○○後送法官」，court.html 要勾「我已看過附件」才算完成
+- 注入偵測不再誤判「以上說明皆屬實」「我無法忽略母親的病情」；畫面改用中性寫法
+
+**安全**
+- court.html 的存取碼只存在這個分頁（sessionStorage），舊版存在 localStorage 的會自動搬走
+- 書記官摘要改由程式產生（`Screening.summarize`），不再把所有申請送給 Gemini
+- 修正 court.html 對 CSP 的說明
+
+**統計**
+- court.html 同一位候選人送出多次以最後一次為準，和 Looker Studio 一致
+
+`RULES_VERSION` 改為 `2026-11-04.2`。Apps Script 要重新貼上 `apps-script/Code.gs` 並部署新版本；PartyRock 模組 6 的摘要提示詞要同步。
+
 ## 2026-11-04　全面審查與重構
 
 詳見 [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md)。

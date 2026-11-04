@@ -5,7 +5,10 @@
  * 用 tests/fixtures/exemptions.json 的標註資料，算出：
  *   - 覆蓋率：規則層自己判掉幾成（其餘交給 AI，花 token）
  *   - 規則層正確率：規則判的那些，「類型」和人工標註（gold）一致的比例
- *   - 誤放行：規則說「可直接送法官」但標註不是同一類型的件數（這個一定要是 0）
+ *   - 誤放行：規則說「不需人工確認」（只差核對附件就送法官）但標註不是同一類型的件數（這個一定要是 0）
+ *
+ * 注意：C／X 開頭的 25 筆是調規則時用過的；E 開頭是第二輪審查新增、P 開頭是本人寫法。
+ * 要知道規則對「沒看過的說法」準不準，請再準備一份不拿來調規則的資料。
  *
  * AI 層的評估需要金鑰與網路：設定環境變數 GEMINI_API_KEY 後加 --ai 參數，
  * 會把規則判不了的案例送給 Gemini，比較「AI建議／類型」與 gold。只能用虛構資料。
@@ -16,13 +19,13 @@ const { cases, rocYear } = require('./fixtures/exemptions.json');
 const rows = cases.map(c => ({ c, out: S.ruleClassify(c, { rocYear }) }));
 const byRule = rows.filter(r => r.out);
 const correct = byRule.filter(r => r.out['類型'] === r.c.gold);
-const leaked = byRule.filter(r => r.out['書記官待辦'] === '可直接送法官' && r.out['類型'] !== r.c.gold);
+const leaked = byRule.filter(r => r.out['需人工確認'] === '否' && r.out['類型'] !== r.c.gold);
 
 const pct = (a, b) => (b ? (100 * a / b).toFixed(1) + '%' : '—');
 console.log(`標註案例：${cases.length} 筆`);
 console.log(`規則層覆蓋率：${byRule.length}/${cases.length}（${pct(byRule.length, cases.length)}），其餘交給 AI`);
 console.log(`規則層類型正確率：${correct.length}/${byRule.length}（${pct(correct.length, byRule.length)}）`);
-console.log(`誤放行（規則說可直接送法官，但類型錯）：${leaked.length} 筆`);
+console.log(`誤放行（規則說不需人工確認，但類型錯）：${leaked.length} 筆`);
 byRule.filter(r => r.out['類型'] !== r.c.gold).forEach(r => console.log(`  ✗ ${r.c.id}：規則判「${r.out['類型']}」，標註「${r.c.gold}」`));
 
 async function evalAI() {

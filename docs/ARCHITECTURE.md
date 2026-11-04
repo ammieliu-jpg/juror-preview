@@ -117,24 +117,24 @@ sequenceDiagram
 flowchart TD
   A["一筆申請免除<br/>勾選的事由＋具體情況說明"] --> B{"說明是空的、<br/>含疑似指令文字、<br/>或說法模糊／反悔？"}
   B -->|是| AI
-  B -->|否| C{"自己的年齡 ≥ 70？<br/>（跳過家人的歲數）"}
+  B -->|否| C{"本人寫法的年齡 ≥ 70？<br/>（「我今年 72 歲」算；<br/>「她 85 歲」「家母 85 歲」不算）"}
   C -->|是| R1["得拒絕・第16條第1款"]
   C -->|"勾 70 但未滿"| R0["看起來不符合<br/>需人工確認"]
   C -->|"年次換算剛好 70"| AI
-  C -->|沒寫| D{"有提到家人朋友？"}
-  D -->|是| AI
-  D -->|否| E{"本人在學／任教？"}
-  E -->|是| R2["得拒絕・第16條第2、3款"]
-  E -->|否| F{"第14條列舉職業？<br/>（排除助理、退休、否定句、國民法官）"}
-  F -->|是| R3["不得擔任・第14條"]
-  F -->|否| G{"自述曾任國民法官？"}
+  C -->|沒寫| G{"自述曾任國民法官？<br/>（不是家人）"}
   G -->|是| R4["得拒絕・第16條第9款<br/>請調閱紀錄"]
-  G -->|否| AI
+  G -->|否| D{"提到別人，<br/>或退休、畢業、以前？"}
+  D -->|是| AI
+  D -->|否| E{"「我是／就讀」＋學校身分？<br/>（補習班、社區大學不算）"}
+  E -->|是| R2["得拒絕・第16條第2、3款"]
+  E -->|否| F{"「我是警察」「我在地檢署當書記官」？<br/>（職業後面就結束；排除助理、外包、國民法官）"}
+  F -->|是| R3["不得擔任・第14條"]
+  F -->|否| AI
 
   AI["AI：buildPrompt → Gemini → checkAI<br/>類型／AI建議不在白名單 → 保守值＋格式異常"]
 
   R1 & R2 & R3 --> P{"說明有寫附件？"}
-  P -->|有| OK["可直接送法官"]
+  P -->|有| OK["核對附件後送法官<br/>（書記官看過實際文件後打勾）"]
   P -->|沒有| NEED["需人工確認：請補證明"]
   AI --> H{"AI 說可能符合＋不需確認，<br/>而且有附件、沒有可疑文字？"}
   H -->|是| OK
@@ -143,7 +143,8 @@ flowchart TD
   OK & NEED & R0 & R4 --> Z["finalize：附件類型和事由對不上 → 需人工確認<br/>結果只是初步整理，是否准許由法官決定"]
 ```
 
-規則層的判斷都有測試案例（`tests/fixtures/exemptions.json`），`npm run eval` 會算出覆蓋率與正確率。
+規則層採白名單：只有本人寫法才判，其他一律交給 AI＋人工。每條規則都有測試案例（`tests/fixtures/exemptions.json`），`npm run eval` 會算出覆蓋率與正確率。
+附件只是民眾在說明裡寫的字，所以不論哪一層，最好的結果都是「核對附件後送法官」，不會出現「可直接送法官」。
 
 ---
 
@@ -183,9 +184,11 @@ flowchart LR
 |---|---|---|
 | 提示注入（「忽略以上規則…」） | 標籤包裝、`INJECT` 偵測、白名單、AI 不能單獨放行 | `lib/screening.js` |
 | 公式注入（`=IMPORTDATA(…)`） | `sanitizeCell()` | `lib/screening.js`、`apps-script/main.gs` |
-| XSS | `esc()`、CSP `script-src 'self'` | `court.js`、`court.html` |
+| XSS | `esc()`、CSP `script-src 'self'`（`connect-src` 允許的 Google 網域任何人都能架服務，擋不住注入後的外送，所以重點是不讓程式注入） | `court.js`、`court.html` |
 | 試算表外流 | 網頁應用程式＋存取碼，試算表不公開 | `doGet()` |
 | 金鑰外流 | 金鑰放 Apps Script 指令碼屬性；瀏覽器預設只存 sessionStorage | `main.gs`、`court.js` |
+| 存取碼外流（讀得到全部說明） | 只存在這個分頁（sessionStorage），不提供「記住」 | `court.js` |
+| AI 摘要算錯、多送資料 | 摘要由程式產生（`summarize`），不呼叫 AI | `lib/screening.js` |
 | 同時寫入 | `LockService` | `withLock_()` |
 | 健康資料留在網址 | 說明不進預填網址，改複製貼上 | `index.html` |
 
@@ -196,7 +199,7 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph 共用純函式["lib/（純函式，有單元測試）"]
-    SC["screening.js<br/>RULES_PROMPT · ruleClassify · checkAI<br/>finalize · sanitizeCell · normalizeReply"]
+    SC["screening.js<br/>RULES_PROMPT · ruleClassify · checkAI<br/>finalize · summarize · sanitizeCell · normalizeReply"]
     QA["qa-search.js<br/>parseEntries · keywordAnswer<br/>hybridAnswer · chatReply"]
   end
   IDX["index.html<br/>劇本、像素繪圖、音效、手機介面"] --> QA

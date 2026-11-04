@@ -90,6 +90,7 @@ test('規則判得了的申請：不呼叫 Gemini，標「規則」', () => {
   assert.equal(ai['AI 對應事由'], '年滿七十歲以上');
   assert.equal(ai['判斷來源'], '規則');
   assert.equal(ai['需人工確認'], '否');
+  assert.equal(ai['書記官待辦'], '核對身分證明後送法官', '附件只是自述，不能寫「可直接送法官」');
 });
 
 test('AI 回傳公式時，寫進試算表前要變成純文字（防公式注入）', () => {
@@ -163,4 +164,24 @@ test('rebuildDashboard：輸出模組 4 格式，名冊上沒回覆的標「未�
   const fc = env.ss.getSheetByName('到場預測').data;
   assert.equal(fc[9][0], '預測到場人數');
   assert.match(fc[9][1], /^=ROUND/);
+});
+
+test('writeSummary：由程式統計，不呼叫 Gemini；同一人送出多次以最後一次為準', () => {
+  const env = makeEnv({
+    rows: [
+      ['t1', 'C055', '申請免除', '年滿 70 歲以上', '我今年 72 歲。（附身分證影本）'],
+      ['t2', 'C046', '申請免除', '有重大疾病、傷害或身心因素', '身體不好。'],
+      ['t3', 'C090', '申請免除', '要照顧家人或養育小孩，執行職務有困難', '要照顧小孩。'],
+      ['t4', 'C090', '到場', '', ''], // 撤回免除申請
+    ],
+    props: { GEMINI_API_KEY: 'k' },
+  });
+  env.classifyPending(); // 假 Gemini 一直回 500 → C046 待人工
+  const calls = env.llmCalls.length;
+  env.writeSummary();
+  assert.equal(env.llmCalls.length, calls, '產生摘要不可以呼叫 Gemini');
+  const text = env.ss.getSheetByName('書記官摘要').data[0][1];
+  assert.match(text, /^共 2 筆免除申請/, 'C090 已改成到場，不算');
+  assert.match(text, /C046：尚未分類/);
+  assert.match(text, /核對附件後可送法官（1 筆）：C055/);
 });
