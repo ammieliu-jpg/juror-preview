@@ -1,0 +1,13 @@
+{
+  "name": "juror-preview",
+  "private": true,
+  "description": "這次換你判：AI 國民法官預演室（NextWave 2026 AI法創黑客松原型）",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "eval": "node tests/eval-rules.js",
+    "build:gs": "node scripts/build-gs.mjs",
+    "check": "node scripts/build-gs.mjs --check && node --test tests/*.test.js"
+  },
+  "engines": { "node": ">=20" }
+}

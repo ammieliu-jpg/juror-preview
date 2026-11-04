@@ -1,0 +1,14 @@
+name: test
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check   # Code.gs 是否同步＋單元測試
+      - run: npm run eval    # 規則層誤放行 > 0 會失敗
