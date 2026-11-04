@@ -36,9 +36,12 @@ index.html              民眾端：像素遊戲＋問答小幫手
 court.html / court.js   法院端儀表板（版面＋CSP／程式）
 lib/screening.js        免除初篩：事由清單、規則、AI 回傳檢查（court.html 與 Apps Script 共用）
 lib/qa-search.js        問答比對（關鍵字、語意＋關鍵字混合）
-apps-script/main.gs     Apps Script 原始碼（表單送出 → 分類 → 寫回試算表 → 儀表板資料）
-apps-script/Code.gs     自動產生，貼進 Apps Script 的就是這個檔
-prompts/                PartyRock 提示詞（模組 2、3、5、6）
+lib/self-help.js        民眾端免除初篩、專屬準備清單（瀏覽器內，免登入）
+apps-script/main.gs     法院端 Apps Script 原始碼（表單送出 → 分類 → 寫回試算表 → 儀表板資料）
+apps-script/Code.gs     自動產生，貼進法院端 Apps Script 的就是這個檔
+apps-script/public-ai.gs 民眾端 AI 代理原始碼（AI 自由評議，免登入，預設關閉）
+apps-script/PublicAI.gs 自動產生，貼進另一個獨立的 Apps Script 專案
+prompts/                PartyRock 提示詞（模組 2、3、5、6；只給評審看）
 tests/                  單元測試、25 筆標註案例、準確度評估
 docs/                   說明文件
 ```
@@ -50,7 +53,7 @@ docs/                   說明文件
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架構圖：全貌、一筆回覆的旅程、初篩流程、問答流程、信任邊界、程式結構、部署 |
 | [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) | 安全與架構審查：所有發現與處理狀態 |
 | [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md) | 表單、試算表、模組 4、Looker Studio、court.html 的欄位對照 |
-| [docs/SETUP.md](docs/SETUP.md) | Gemini 金鑰、Apps Script、網頁應用程式、儀表板、Looker Studio 設定步驟 |
+| [docs/SETUP.md](docs/SETUP.md) | Gemini 金鑰、Apps Script、網頁應用程式、儀表板、Looker Studio、民眾端 AI 代理設定步驟 |
 | [docs/REFACTORING.md](docs/REFACTORING.md) | 已完成與建議的重構、單元測試寫法與範例 |
 | [docs/PROMPTS.md](docs/PROMPTS.md) | 6 個 AI 模組、提示詞放在哪、改了要同步哪裡 |
 | [CHANGELOG.md](CHANGELOG.md) | 修改紀錄 |

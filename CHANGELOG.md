@@ -1,5 +1,16 @@
 # 修改紀錄
 
+## 2026-11-04　民眾端免登入
+
+PartyRock 要登入 AWS 帳號，民眾不會為了這個去註冊，所以民眾端不再連到 PartyRock（只留給評審看）。
+
+- **免除初篩＋說明草稿（模組 3）**：改在瀏覽器裡執行（`lib/self-help.js`）。第一層沿用法院端的 `Screening.ruleClassify`，第二層分出第 16 條第 4、6、7、8、10 款並提示要寫清楚什麼。病名、家人狀況等敏感資料不離開瀏覽器。
+- **專屬準備清單（模組 2）**：選身分、勾擔心的事，列出常見問答原文，沒有 AI 改寫。
+- **AI 自由評議（模組 5）**：新增 `apps-script/PublicAI.gs` 代理 Gemini。金鑰與提示詞在伺服器端、對話紀錄在伺服器快取、全站限流、每場回合上限、注入防護。`index.html` 的 `AI_PROXY` 空白時不顯示，照劇本評議。
+- 入口：第 2 關調查表、結尾、手機答不出來時、手機底部「更多工具」。
+- `npm run build:gs` 另外產生 `apps-script/PublicAI.gs`（評議提示詞以 `index.html` 的 `DELIB` 為唯一來源）。
+- 新增 28 個測試（`tests/self-help.test.js`、`tests/public-ai.test.js`）。
+
 ## 2026-11-04　全面審查與重構
 
 詳見 [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md)。

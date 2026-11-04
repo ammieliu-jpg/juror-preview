@@ -1,14 +1,14 @@
 # AI 模組與提示詞
 
-PartyRock 沒有 API，提示詞只能手動貼上。`prompts/` 收錄目前的版本，方便追蹤修改；**改了這裡，要記得同步到 PartyRock**。
+PartyRock 要登入才能用，所以**民眾端不再連到 PartyRock**，只留給評審看各個 AI 模組。PartyRock 沒有 API，提示詞只能手動貼上。`prompts/` 收錄目前的版本，方便追蹤修改；**改了這裡，要記得同步到 PartyRock**。
 
 | 模組 | 用途 | 使用者 | 在哪裡跑 | 提示詞 |
 |---|---|---|---|---|
 | 1 | 常見問答小幫手 | 民眾 | 遊戲右下角手機（瀏覽器內語意搜尋）；PartyRock 版給評審看 AI 模組 | `index.html` 的 `KB`＝`prompts/PartyRock問答提示詞.txt` |
-| 2 | 個人化導覽（到庭準備清單） | 民眾 | PartyRock | `prompts/模組2_個人化導覽設定.txt` |
-| 3 | 免除資格初篩＋申請說明草稿 | 民眾 | PartyRock | `prompts/模組3_免除初篩設定.txt` |
+| 2 | 個人化導覽（到庭準備清單） | 民眾 | 遊戲裡的「專屬準備清單」（瀏覽器內，免登入，只列常見問答原文）；PartyRock 版給評審看 | `lib/self-help.js` 的 `ROLES`、`WORRIES`；PartyRock 版 `prompts/模組2_個人化導覽設定.txt` |
+| 3 | 免除資格初篩＋申請說明草稿 | 民眾 | 遊戲裡的「免除初篩」（瀏覽器內，免登入，狀況描述不送出）；PartyRock 版給評審看 | `lib/self-help.js` 的 `checkSituation`（第一層沿用 `lib/screening.js`）；PartyRock 版 `prompts/模組3_免除初篩設定.txt` |
 | 4 | 法院儀表板（到場預測） | 書記官 | Google 試算表＋Looker Studio | 不用 AI；資料格式見 [DATA_SCHEMA.md](DATA_SCHEMA.md) |
-| 5 | 模擬評議 | 民眾 | PartyRock（遊戲第 7 關的連結） | `prompts/模組5_AI模擬評議提示詞.txt`；`index.html` 的 `DELIB` |
+| 5 | 模擬評議 | 民眾 | 遊戲第 7 關的手機，經 `apps-script/PublicAI.gs` 代理（免登入，預設關閉）；PartyRock 版給評審看 | `index.html` 的 `DELIB`（`npm run build:gs` 會放進 `PublicAI.gs`）；PartyRock 版 `prompts/模組5_AI模擬評議提示詞.txt` |
 | 6 | 免除申請自動分類 | 書記官 | Apps Script（自動）、court.html、PartyRock（展示） | `lib/screening.js` 的 `RULES_PROMPT`；PartyRock 版 `prompts/模組6_免除申請自動分類設定.txt` |
 
 ## 事由清單的單一來源
@@ -18,6 +18,7 @@ PartyRock 沒有 API，提示詞只能手動貼上。`prompts/` 收錄目前的�
 1. `prompts/模組3_免除初篩設定.txt`（第 2 步）→ PartyRock 模組 3「初篩結果」
 2. `prompts/模組6_免除申請自動分類設定.txt`（第 2 步）→ PartyRock 模組 6「分類結果」
 3. `index.html` 遊戲第 2 關的簡化調查表（`surveyModal`）與試填表單的 `REASONS`、`REASON_EG`
+4. `lib/self-help.js` 的 `ART16`（民眾端免除初篩的第 16 條各款白話標題與應附證明）
 
 改完執行 `npm run build:gs`，並把 `lib/screening.js` 裡的 `RULES_VERSION` 改成當天日期（court.html 的快取會因此重算）。
 
