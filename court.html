@@ -27,6 +27,7 @@
   --accent:#7ea2f0; --ok:#5fc48a; --warn:#e7a04c; --bad:#ec7a70; --chip:#2c2935; color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#17161c;--panel:#211f28;--line:#36333f;--ink:#ece8f2;--mute:#a09aae;--accent:#7ea2f0;--ok:#5fc48a;--warn:#e7a04c;--bad:#ec7a70;--chip:#2c2935;color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important} /* .form 的 display:grid 會蓋過 hidden，資料來源沒選到的欄位也會顯示 */
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.55}
 .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
 header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:16px}
@@ -74,6 +75,7 @@ label.doc{display:flex;gap:4px;align-items:center;margin-top:4px;font-size:12px;
 label.doc.done{color:var(--ok)}
 #summary{white-space:pre-wrap;margin:0}
 .empty{color:var(--mute);padding:20px 0;text-align:center}
+.warnbox{border-color:var(--warn);color:var(--warn);font-size:14px}
 @media (prefers-reduced-motion:reduce){tr.new td{animation:none}}
 </style>
 </head>
@@ -90,6 +92,8 @@ label.doc.done{color:var(--ok)}
   <button id="demo">載入示範資料</button>
   <span class="status" id="status">尚未載入資料</span>
 </div>
+
+<p class="panel warnbox" id="verWarn" role="alert" hidden></p>
 
 <details class="panel" id="settings">
   <summary>設定（資料來源、AI 金鑰）</summary>

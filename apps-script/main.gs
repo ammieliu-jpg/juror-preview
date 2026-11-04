@@ -6,8 +6,9 @@
  *   貼進 Apps Script 的是 apps-script/Code.gs（npm run build:gs 產生，已含 lib/screening.js）。
  *
  * 民眾送出 Google 表單後：
- *   1. onFormSubmit 讀取那一列；不是「申請免除」就標記略過
- *   2. 先用 Screening.ruleClassify 規則判（不花 token）；判不了才呼叫 Gemini
+ *   1. onFormSubmit 讀取那一列；同一人後來又送出、或不是「申請免除」就標記略過
+ *   2. 先檢查編號格式與通知名冊，再用 Screening.ruleClassify 規則判（都不花 token）；
+ *      判不了、而且編號通過檢查，才呼叫 Gemini（呼叫時不鎖，避免同時送出的人拿不到鎖）
  *   3. Gemini 回傳經 Screening.checkAI 檢查白名單，再經 Screening.finalize 核對附件
  *   4. 結果寫在同一列右邊的 AI 欄位（寫入前經 Screening.sanitizeCell 防公式注入）
  *   5. 重建「回覆資料」「到場預測」兩個工作表，格式和模組 4 相同，Looker Studio 直接連
@@ -19,9 +20,11 @@
  *   GEMINI_API_KEY   必填。AI Studio 申請的金鑰
  *   GEMINI_MODEL     選填。預設 gemini-2.5-flash
  *   DASHBOARD_TOKEN  選填。court.html 讀資料用的存取碼（建議 20 字以上亂碼）；沒設就不開放讀取
+ *   NEEDED_PER_CASE  選填。到場預測的「選任所需人數」，由法院依個案設定（沒設暫用 57）
  *
  * ⚠ 免費版 Gemini API 的資料可能被 Google 用來改進模型：Demo 只能用虛構資料。
- * 正式上線應改接法院自建模型（例如 TAIDE），只要換掉 callLLM_()。
+ * 換模型（例如法院自建的 TAIDE）只要改 callLLM_()；但正式上線時資料不會放在 Google 試算表，
+ * 這個檔案是示範用的外殼，能帶走的是 lib/screening.js（見 docs/ARCHITECTURE.md「導入路徑」）。
  */
 
 /** @OnlyCurrentDoc */ // 只要求「這一份試算表」的權限，避免 Google 擋下授權
@@ -39,7 +42,7 @@ const FIELDS = {
   note:    { re: /說明/,            fallback: 5 },
 };
 /** AI 寫入的欄位（不存在就自動加在最右邊）。只能在最後面新增，不要改順序。 */
-const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '書記官待辦', 'AI 處理時間', '判斷來源'];
+const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '書記官待辦', 'AI 處理時間', '判斷來源', '規則版本'];
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 /** Apps Script 單次執行上限 6 分鐘；留 1 分鐘緩衝，超過就先停，請使用者再按一次。 */
 const TIME_BUDGET_MS = 5 * 60 * 1000;
@@ -60,51 +63,81 @@ function onOpen() {
     .addToUi();
 }
 
-/** 觸發條件：「試算表 → 提交表單時」。同時有兩筆送出時用鎖排隊，避免欄位標題重複新增。 */
+/**
+ * 觸發條件：「試算表 → 提交表單時」。
+ * 鎖只包住「新增欄位標題、寫入、重建儀表板」這幾個很快的步驟，呼叫 Gemini 時不鎖。
+ * 以前整段都鎖著：一筆 AI 遇到 429 要等上近一分鐘，同時送出的其他人等 30 秒拿不到鎖就失敗，那幾筆不會被分類。
+ */
 function onFormSubmit(e) {
-  withLock_(() => {
-    classifyRow_(e.range.getSheet(), e.range.getRow());
-    rebuildDashboard();
-  });
+  classifyRow_(e.range.getSheet(), e.range.getRow());
+  withLock_(rebuildDashboard);
 }
 
-/** 選單：補跑所有還沒有「AI 處理時間」的列。接近 6 分鐘上限時會先停。 */
+/**
+ * 選單：補跑還沒處理完的列，接近 6 分鐘上限時會先停。
+ *   - 還沒有「AI 處理時間」的（觸發失敗、AI 失敗）
+ *   - 舊版規則判的（lib/screening.js 的規則改了：用新規則重判，規則判不了的改交 AI）
+ */
 function classifyPending() {
   const started = Date.now();
-  let n = 0, left = 0;
-  withLock_(() => {
-    const sheet = responseSheet_();
-    const cols = cols_(sheet);
-    const last = sheet.getLastRow();
-    for (let r = 2; r <= last; r++) {
-      if (sheet.getRange(r, cols.ai['AI 處理時間']).getValue() !== '') continue;
-      if (Date.now() - started > TIME_BUDGET_MS) { left++; continue; }
-      const res = classifyRow_(sheet, r);
-      if (res.counted) n++;
-      if (res.usedAI) Utilities.sleep(AI_GAP_MS);
-    }
-    rebuildDashboard();
-  });
-  SpreadsheetApp.getActive().toast(left ? `已處理 ${n} 筆，還有 ${left} 筆，請再按一次。` : `完成，共處理 ${n} 筆申請免除。`, 'AI 免除分類');
+  const sheet = responseSheet_();
+  const cols = withLock_(() => cols_(sheet));
+  const data = sheet.getDataRange().getValues();
+  const ctx = context_(cols, data);
+  let n = 0, redo = 0, left = 0;
+  for (let r = 2; r <= data.length; r++) {
+    const row = data[r - 1];
+    const stale = row[cols.ai['判斷來源'] - 1] === '規則' && row[cols.ai['規則版本'] - 1] !== Screening.RULES_VERSION;
+    if (row[cols.ai['AI 處理時間'] - 1] !== '' && !stale) continue;
+    if (Date.now() - started > TIME_BUDGET_MS) { left++; continue; }
+    const res = classifyRow_(sheet, r, ctx);
+    if (res.counted) { n++; if (stale) redo++; }
+    if (res.usedAI) Utilities.sleep(AI_GAP_MS);
+  }
+  withLock_(rebuildDashboard);
+  const done = `共處理 ${n} 筆申請免除` + (redo ? `（其中 ${redo} 筆是舊版規則判的，已用新規則重判）` : '');
+  SpreadsheetApp.getActive().toast(left ? `${done}，還有 ${left} 筆，請再按一次。` : `完成，${done}。`, 'AI 免除分類');
 }
 
 /* ---------- 分類一列 ---------- */
 
 /**
- * 分類試算表的一列並寫回 AI 欄位。
+ * 一次讀好的檢查資料：每個編號最後一次送出在哪一列；通知名冊（有建立的話）。
+ * @returns {{latest:Object<string,number>, roster:Set<string>|null}}
+ */
+function context_(cols, data) {
+  const latest = {};
+  data.slice(1).forEach((r, i) => { const id = String(r[cols.id - 1]).trim(); if (id) latest[id] = i + 2; });
+  const sh = SpreadsheetApp.getActive().getSheetByName(DASH.roster);
+  const roster = sh ? new Set(sh.getDataRange().getValues().slice(1).map(r => String(r[0]).trim()).filter(Boolean)) : null;
+  return { latest, roster };
+}
+
+/**
+ * 分類試算表的一列並寫回 AI 欄位。順序是「先檢查（不花 token）→ 規則 → AI」：
+ *   1. 同一人後來又送出 → 以後來的為準，這筆不分類（和 rebuildDashboard、court.html 一致）
+ *   2. 不是「申請免除」→ 標記略過
+ *   3. 編號格式異常或不在通知名冊 → 規則判得了照判，判不了也不送 AI（避免假資料耗掉額度），一律人工確認
+ *   4. 規則判不了 → AI（呼叫時不鎖）
+ * @param {object} [ctx]  context_() 的結果；沒給就現讀（onFormSubmit）
  * @returns {{counted:boolean, usedAI:boolean}}
  */
-function classifyRow_(sheet, row) {
-  const cols = cols_(sheet);
+function classifyRow_(sheet, row, ctx) {
+  const cols = withLock_(() => cols_(sheet)); // 可能要新增欄位標題：鎖著，避免兩筆同時送出時新增兩組
+  ctx = ctx || context_(cols, sheet.getDataRange().getValues());
   const app = readApp_(sheet, row, cols);
   const stamp = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm');
-  if (Screening.normalizeReply(app.reply) !== '申請免除') {
-    writeAI_(sheet, row, cols, { 'AI建議': '（非免除申請，不需分類）' }, stamp, '');
-    return { counted: false, usedAI: false };
-  }
+  const skip = label => { withLock_(() => writeAI_(sheet, row, cols, { 'AI建議': label }, stamp, '')); return { counted: false, usedAI: false }; };
+  if (app.id && ctx.latest[app.id] && ctx.latest[app.id] !== row) return skip('（同一人後來又送出，以最後一次為準）');
+  if (Screening.normalizeReply(app.reply) !== '申請免除') return skip('（非免除申請，不需分類）');
+
+  const problem = !Screening.isPlausibleId(app.id) ? '候選人編號格式異常，請核對名冊'
+    : ctx.roster && !ctx.roster.has(app.id) ? '候選人編號不在通知名冊，請核對' : '';
   let out = Screening.ruleClassify(app);
   let usedAI = false;
-  if (!out) {
+  if (!out && problem) {
+    out = { '對應事由': '—', '類型': '—', 'AI建議': '資料不足', '需人工確認': '是', '理由': '編號未通過檢查，未送 AI', '書記官待辦': problem, src: 'rule' };
+  } else if (!out) {
     usedAI = true;
     try {
       out = Screening.checkAI(Screening.parseJson(callLLM_(Screening.buildPrompt(app))), app);
@@ -113,11 +146,10 @@ function classifyRow_(sheet, row) {
     }
   }
   out = Screening.finalize(out, app);
-  if (!Screening.isPlausibleId(app.id)) {
-    out = Object.assign({}, out, { '需人工確認': '是', '書記官待辦': '候選人編號格式異常，請核對名冊' });
-  }
+  if (problem) out = Object.assign({}, out, { '需人工確認': '是', '書記官待辦': problem });
   // AI 失敗（pending）不寫處理時間，下次「分類所有尚未處理的申請」會再試
-  writeAI_(sheet, row, cols, out, out.src === 'pending' ? '' : stamp, { rule: '規則', ai: 'AI', pending: '待人工' }[out.src] || '');
+  const source = { rule: '規則', ai: 'AI', pending: '待人工' }[out.src] || '';
+  withLock_(() => writeAI_(sheet, row, cols, out, out.src === 'pending' ? '' : stamp, source));
   return { counted: true, usedAI };
 }
 
@@ -131,6 +163,7 @@ function writeAI_(sheet, row, cols, out, stamp, source) {
   const vals = {
     'AI 對應事由': out['對應事由'], 'AI 類型': out['類型'], 'AI 建議': out['AI建議'], '需人工確認': out['需人工確認'],
     'AI 理由': out['理由'], '書記官待辦': out['書記官待辦'], 'AI 處理時間': stamp, '判斷來源': source,
+    '規則版本': Screening.RULES_VERSION,
   };
   AI_COLS.forEach(k => sheet.getRange(row, cols.ai[k]).setValue(Screening.sanitizeCell(vals[k] || '')));
   if (out['需人工確認'] === '是') sheet.getRange(row, cols.ai['需人工確認']).setBackground('#fde2b8');
@@ -199,20 +232,23 @@ function rebuildDashboard() {
   if (out.length) rep.getRange(2, 1, out.length, header.length).setValues(out);
 
   const n = Math.max(out.length + 1, 2), D = `回覆資料!D2:D${n}`;
+  // 選任所需人數要由法院依個案設定；名冊有好幾個案號時，下面是合計，不是個案預測
+  const neededProp = Number(PropertiesService.getScriptProperties().getProperty('NEEDED_PER_CASE'));
+  const cases = new Set(base.map(r => String(r[1] || '').trim()).filter(Boolean)).size;
   const fc = ss.getSheetByName(DASH.forecast) || ss.insertSheet(DASH.forecast);
   fc.clearContents();
   fc.getRange(1, 1, 12, 3).setValues([
     ['項目', '數值', '說明'],
-    ['通知人數', `=COUNTA(回覆資料!A2:A${n})`, roster ? '通知名冊的人數' : '尚未建立「通知名冊」，只計有回覆的人'],
+    ['通知人數', `=COUNTA(回覆資料!A2:A${n})`, !roster ? '尚未建立「通知名冊」，只計有回覆的人' : cases > 1 ? `名冊有 ${cases} 個案號，以下是合計，不是個案預測（個案請在 Looker Studio 依案號篩選）` : '通知名冊的人數'],
     ['回覆會到場', `=COUNTIF(${D},"會到場")`, ''],
     ['申請免除', `=COUNTIF(${D},"申請免除")`, '交由法院審查，預測時不計入到場'],
     ['未回覆', `=COUNTIF(${D},"未回覆")`, ''],
     ['尚未決定', `=COUNTIF(${D},"尚未決定")`, '有回覆但還沒決定，預測時比照未回覆'],
     ['回覆率', '=IFERROR((B3+B4+B6)/B2,0)', '有回覆的比例'],
     ['回覆會到場者的實際到場率（假設）', DASH.showRate, '假設值，正式上線後用實際資料校正'],
-    ['未回覆者的到場率（假設）', DASH.baseRate, '沿用113年整體到場率48.9%（司法院）'],
+    ['未回覆者的到場率（假設）', DASH.baseRate, '沿用113年整體到場率48.9%（司法院）。沒回覆的人實際到場率可能更低，上線後要用實際資料校正'],
     ['預測到場人數', '=ROUND(B3*B8+(B5+B6)*B9,0)', '回覆會到場×履約率 +（未回覆＋尚未決定）×歷史到場率'],
-    ['選任所需人數（假設）', DASH.needed, '113年平均每案實際到場約57人'],
+    ['選任所需人數（假設）', neededProp || DASH.needed, neededProp ? '指令碼屬性 NEEDED_PER_CASE' : '暫用113年平均每案到場人數（約57人），這不是需求人數。請依國民法官6人、備位人數與預估拒卻人數，設定指令碼屬性 NEEDED_PER_CASE'],
     ['預測是否足額', '=IF(B10>=B11,"足額","不足，建議追加通知")', ''],
   ]);
 }

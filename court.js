@@ -87,6 +87,8 @@
   var CACHE_KEY = 'cache:' + S.RULES_VERSION;
   var cache = local.get(CACHE_KEY, {});
   var rows = [], seen = null, timer = null, running = false, isDemo = false;
+  // Apps Script 回報的規則版本。和這一頁的不同，代表有人改了 lib/screening.js 卻還沒重新部署 Apps Script（或反過來）
+  var remoteVersion = null;
   // 書記官看過實際附件後打勾；沒打勾的「核對附件後送法官」不算完成
   var docOk = local.get('docOk', {});
 
@@ -146,6 +148,7 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var j = await res.json();
       if (!j.ok) throw new Error(j.error || '讀取失敗');
+      remoteVersion = j.rulesVersion || '（未知）';
       return j.rows;
     }
     var url = S.csvUrl(cfg.sheetUrl, cfg.sheetName);
@@ -163,11 +166,15 @@
     try {
       isDemo = !!fromDemo;
       var all, msg;
+      remoteVersion = null;
       if (fromDemo) { all = DEMO.map(function (r) { return Object.assign({}, r); }); msg = '示範資料（虛構）'; }
       else { $('status').textContent = '讀取中……'; all = await fetchRows(); msg = '已更新 ' + new Date().toLocaleTimeString('zh-TW', { hour12: false }); }
       var latest = latestPerId(all);
       rows = latest.rows;
       $('status').textContent = msg + (latest.dropped ? '（有 ' + latest.dropped + ' 筆是同一人重複送出，以最後一次為準）' : '');
+      $('verWarn').hidden = !remoteVersion || remoteVersion === S.RULES_VERSION;
+      $('verWarn').textContent = '⚠ 規則版本不一致：Apps Script 是 ' + remoteVersion + '，這一頁是 ' + S.RULES_VERSION +
+        '。兩邊的判斷可能不同。請把 apps-script/Code.gs 重新貼進 Apps Script，部署新版本，再按選單「分類所有尚未處理的申請」重判舊版規則判的申請。';
       // 網頁應用程式模式：Apps Script 已經分類好的，直接用
       rows.forEach(function (r) { var c = fromSheet(r.ai); if (c) cache[keyOf(r)] = c; });
       render(); classifyAll();
