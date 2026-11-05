@@ -12,3 +12,15 @@ jobs:
           node-version: 22
       - run: npm run check   # Code.gs 是否同步＋單元測試
       - run: npm run eval    # 規則層誤放行 > 0 會失敗
+
+  # 用真的瀏覽器操作網頁：民眾端用手機尺寸（含從頭玩到結尾），法院端用電腦尺寸
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i --no-save playwright@1.63.0   # 只有這個 job 需要，不寫進 package.json
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

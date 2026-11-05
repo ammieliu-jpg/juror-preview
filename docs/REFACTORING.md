@@ -81,7 +81,14 @@ npm run eval      # 規則層準確度評估
 npm run check     # 檢查 Code.gs 有沒有同步＋跑測試（push 前跑這個）
 ```
 
-GitHub Actions（`.github/workflows/test.yml`）每次 push 和開 PR 都會自動跑 `npm run check` 與 `npm run eval`。
+GitHub Actions（`.github/workflows/test.yml`）每次 push 和開 PR 都會自動跑 `npm run check`、`npm run eval`，以及另一個 job 跑瀏覽器測試（`npm run test:browser`）。
+
+瀏覽器測試要先裝 Playwright（只有這份測試需要，所以不寫進 `package.json`）：
+
+```bash
+npm i --no-save playwright@1.63.0 && npx playwright install chromium
+npm run test:browser   # 10 項，約 15 秒
+```
 
 ### 測試檔案
 
@@ -92,6 +99,7 @@ GitHub Actions（`.github/workflows/test.yml`）每次 push 和開 PR 都會自�
 | `tests/apps-script.test.js` | Apps Script 整體流程 | 用假的 `SpreadsheetApp` 在 Node 裡跑 `onFormSubmit`、`doGet`、`rebuildDashboard` |
 | `tests/build.test.js` | `Code.gs` 是否同步、HTML 引用的檔案是否存在 | |
 | `tests/eval-rules.js` | 準確度評估（不是 pass/fail 測試） | 覆蓋率、正確率、誤放行數 |
+| `tests/browser/ui.test.js` | 用真的 Chromium 操作網頁（單元測試考不到的畫面問題） | 民眾端手機與筆電尺寸都測（有人掃不了 QR code，會用電腦輸入網址）。手機尺寸：勾選框是淺色樣式、提醒文字不小於 13px、選項不矮於 40px、印章不蓋住標題、問答回答從開頭顯示、從頭玩到結尾沒有錯誤；電腦尺寸：法院端示範資料、附件勾選、摘要 |
 
 ### 範例 1：純函式（最簡單）
 
@@ -149,5 +157,21 @@ assert.ok(aiOf(env, 2)['AI 對應事由'].startsWith("'="));
 
 E、P 開頭的 19 筆是第二輪才加的，規則也照著它們改過，所以這個 100% 仍是「考自己出的題目」。
 下一步：請法律背景的成員另外寫 50～100 筆**不拿來調規則**的說法，只用來評估。
+
+### 問答小幫手（`npm run eval:qa`）
+
+55 題換過說法的問題（不照抄資料庫）＋10 題資料庫沒有的問題（`tests/fixtures/qa-questions.json`）。語意模型要從 Hugging Face 下載，GitHub Actions 的 `qa-eval` 會在改了問答相關檔案時自動跑。
+
+| 做法 | 答對 | 答錯，但有標「我不太確定」 | 答錯又沒標 | 資料庫沒有卻回答 | 模型大小 |
+|---|---|---|---|---|---|
+| 只用關鍵字 | 32 | — | 3 | 0/10 | 0 |
+| bge-small-zh，舊門檻 0.60 | 50 | — | 5 | **6/10** | 23 MB |
+| **bge-small-zh，門檻 0.72／0.85（目前）** | 48 | 3 | **0** | 0/10 | 23 MB |
+| multilingual-e5-small，門檻 0.93／0.96 | 50 | 0 | 2 | 0/10 | 113 MB |
+
+- 舊門檻 0.60 會把資料庫沒有的問題配上不相干的答案（「怎麼申請護照」→ 照顧長輩）。已改成 0.72。
+- 「我不太確定」門檻 0.85：答錯的 3 題都會先說「我不太確定」並附第二個候選；代價是 48 題答對的裡有 20 題也會加上這句。
+- 模型來源：bge-small-zh 是北京智源研究院（BAAI）開源的模型；e5 是微軟的。兩者都在使用者的瀏覽器裡執行，問題不會送出去。e5 多答對 2 題，但答錯的 2 題沒有標「不太確定」，而且檔案大 5 倍（手機要多下載約 90 MB）。目前保留 bge；若主辦單位或司法院要求不用中國大陸來源的模型，改 `index.html` 的 `SEM_CFG` 一行即可換成 e5（門檻已量好）。
+- 門檻是在同一份題目上量的，正式採用前要再用另一份題目確認。
 
 AI 層：`GEMINI_API_KEY=… node tests/eval-rules.js --ai`（只用虛構資料）。建議 Demo 前跑一次，把正確率寫進提案。

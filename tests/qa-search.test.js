@@ -61,3 +61,18 @@ test('needsPersonalHelp：個人狀況要附 AI 導覽連結', () => {
   assert.ok(Q.needsPersonalHelp('我是老師可以不去嗎', ''));
   assert.ok(!Q.needsPersonalHelp('去一天多少錢', '日費 1,500 元'));
 });
+
+test('hybridAnswer：用模型自己的門檻（bge 0.72／0.85）', () => {
+  const [a, b] = entries;
+  const m = Q.MODELS.bge;
+  assert.equal(Q.hybridAnswer(entries, new Map([[a, 0.70], [b, 0.5]]), '隨便', m), Q.NOT_FOUND, '低於 0.72 不回答（舊門檻 0.6 會回答）');
+  assert.match(Q.hybridAnswer(entries, new Map([[a, 0.80], [b, 0.5]]), '隨便', m), /^我不太確定/);
+  assert.match(Q.hybridAnswer(entries, new Map([[a, 0.90], [b, 0.5]]), '隨便', m), /^最接近的問題是/);
+});
+
+test('MODELS：每個模型都有門檻，而且 min < sure', () => {
+  for (const [k, m] of Object.entries(Q.MODELS)) {
+    assert.ok(m.id && m.pooling && typeof m.prefix === 'string', k);
+    assert.ok(m.min < m.sure, k);
+  }
+});

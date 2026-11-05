@@ -1,0 +1,21 @@
+name: qa-eval
+# 問答小幫手評估：比較只用關鍵字、bge-small-zh、multilingual-e5-small 三種做法。
+# 要從 Hugging Face 下載模型，所以不放進每次都跑的 test.yml；改了問答相關檔案才跑，也可以手動執行。
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tests/qa-eval.js'
+      - 'tests/fixtures/qa-questions.json'
+      - 'lib/qa-search.js'
+      - '.github/workflows/qa-eval.yml'
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i --no-save @huggingface/transformers@3.0.2
+      - run: npm run eval:qa

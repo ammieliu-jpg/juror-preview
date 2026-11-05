@@ -7,7 +7,9 @@
     "test": "node --test tests/*.test.js",
     "eval": "node tests/eval-rules.js",
     "build:gs": "node scripts/build-gs.mjs",
-    "check": "node scripts/build-gs.mjs --check && node --test tests/*.test.js"
+    "check": "node scripts/build-gs.mjs --check && node --test tests/*.test.js",
+    "test:browser": "node --test tests/browser/*.test.js",
+    "eval:qa": "node tests/qa-eval.js"
   },
   "engines": { "node": ">=20" }
 }

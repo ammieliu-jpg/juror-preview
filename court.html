@@ -92,6 +92,7 @@ label.doc.done{color:var(--ok)}
   <button class="primary" id="refresh">重新整理</button>
   <label class="status"><input type="checkbox" id="auto"> 每 20 秒自動更新</label>
   <button id="demo">載入示範資料</button>
+  <label class="btn" title="官方系統匯出的 CSV。只在這台電腦處理，不會上傳，也不送 AI">匯入表格檔（CSV）<input type="file" id="importFile" accept=".csv,.tsv,.txt,text/csv" hidden></label>
   <span class="status" id="status">尚未載入資料</span>
 </div>
 
@@ -125,6 +126,7 @@ label.doc.done{color:var(--ok)}
     <label>模型名稱
       <input id="model" value="gemini-2.5-flash"></label>
     <div><button class="primary" id="save">儲存並載入</button> <button id="clearCache">清除 AI 分類快取</button> <button id="forget">清除這台電腦的設定與金鑰</button></div>
+    <p class="fine">「匯入表格檔」讀官方系統匯出的 CSV（UTF-8 或 Big5 都可以），用標題找欄位：編號、回覆、事由、說明。只在這台電腦用規則判，不上傳、不送 AI。欄位說明見 docs/INTEGRATION.md。</p>
     <p class="fine">沒有金鑰也能用：規則判得了的照常分類，其餘標「待 AI」請人工審閱。示範時請只用虛構資料：免費版 Gemini 的資料可能被 Google 用來改進模型。建議在 Google Cloud 把金鑰限制為只能呼叫 Generative Language API。</p>
   </div>
 </details>

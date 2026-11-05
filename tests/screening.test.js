@@ -162,3 +162,28 @@ test('parseJson：模型在 JSON 前後多寫字也能解析', () => {
   assert.deepEqual(S.parseJson('好的：\n{"類型":"無"}\n以上'), { '類型': '無' });
   assert.throws(() => S.parseJson('沒有 JSON'), /格式不正確/);
 });
+
+test('匯入表格：用標題找欄位，順序不同、標題不同也讀得到', () => {
+  assert.deepEqual(S.mapColumns(['候選人編號', '回覆日期', '你的回覆', '勾選的事由', '具體情況說明']), { id: 0, ts: 1, reply: 2, reasons: 3, note: 4 });
+  const t = S.rowsFromTable(S.parseCSV('填答時間,候選人編號,回覆意願,勾選事由,具體說明\n2026/11/03,C201,申請拒絕被選任,年滿 70 歲以上,"我今年 75 歲，行動不便"\n,,,,\n'));
+  assert.equal(t.fallback, false);
+  assert.deepEqual(t.rows, [{ ts: '2026/11/03', id: 'C201', reply: '申請拒絕被選任', reasons: '年滿 70 歲以上', note: '我今年 75 歲，行動不便' }], '空白列要略過');
+  assert.equal(S.normalizeReply(t.rows[0].reply), '申請免除', '「拒絕被選任」就是申請免除');
+});
+
+test('匯入表格：標題認不出來時照 A–E 欄；沒有時間欄用列號當鍵', () => {
+  const a = S.rowsFromTable([['a', 'b', 'c', 'd', 'e'], ['t1', 'C001', '到場', '', '']]);
+  assert.equal(a.fallback, true);
+  assert.equal(a.rows[0].id, 'C001');
+  const b = S.rowsFromTable(S.parseCSV('編號\t回覆\t事由\t說明\nC002\t到場\t\t\n', '\t'));
+  assert.deepEqual(b.rows[0], { ts: '第 2 列', id: 'C002', reply: '到場', reasons: '', note: '' });
+});
+
+test('匯入的範例檔：UTF-8 和 Big5 內容相同', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const dir = path.join(__dirname, 'fixtures');
+  const u = S.rowsFromTable(S.parseCSV(fs.readFileSync(path.join(dir, 'import-utf8.csv'), 'utf8')));
+  const b = S.rowsFromTable(S.parseCSV(new TextDecoder('big5').decode(fs.readFileSync(path.join(dir, 'import-big5.csv')))));
+  assert.equal(u.rows.length, 4);
+  assert.deepEqual(b.rows, u.rows);
+});

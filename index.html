@@ -56,19 +56,19 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .choice{font:inherit;font-size:15px;text-align:left;background:#fffaf0;color:var(--paper-ink);border:2px solid var(--paper-ink);box-shadow:3px 3px 0 var(--paper-ink);padding:8px 12px;cursor:pointer}
 .choice:hover,.choice:focus-visible{background:var(--brass);outline:none}
 .choice.ai{border-style:dashed}
-.note{font-size:12px;color:var(--mute);line-height:1.5}
+.note{font-size:13px;color:var(--mute);line-height:1.5}
 /* modal documents */
 .modal{position:fixed;inset:0;background:rgba(8,9,20,.78);display:flex;align-items:center;justify-content:center;z-index:30;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .doc{background:#fbf6ea;color:var(--paper-ink);max-width:520px;width:100%;max-height:100%;overflow:auto;padding:20px 22px;border:2px solid var(--paper-ink);box-shadow:6px 6px 0 #0e1024;position:relative}
 .doc h3{margin:0 0 4px;font-size:18px;text-align:center;letter-spacing:.1em;text-wrap:balance}
-.doc .sub{text-align:center;font-size:12px;color:#7a6a55;margin-bottom:12px}
+.doc .sub{text-align:center;font-size:13px;color:#7a6a55;margin-bottom:12px}
 .doc dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0 0 12px;font-size:14px}
 .doc dt{color:#7a6a55}
 .doc dd{margin:0}
 .doc .seal{position:absolute;right:18px;top:54px;width:58px;height:58px;border:3px solid var(--stamp);color:var(--stamp);font-size:12px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;transform:rotate(-8deg);opacity:.85}
 .doc .btn{font:inherit;font-weight:700;background:var(--paper-ink);color:var(--paper);border:0;padding:8px 16px;cursor:pointer;margin-top:6px}
 .doc .btn:focus-visible{outline:3px solid var(--brass)}
-.doc .fine{font-size:12px;color:#7a6a55}
+.doc .fine{font-size:13px;color:#7a6a55}
 /* 文件是淺色底：原生勾選框要用淺色樣式，否則沿用 :root 的 dark，沒勾的也是實心深色方塊，看起來像已勾選 */
 .doc{color-scheme:light}
 .doc input[type=checkbox],.doc input[type=radio]{width:18px;height:18px;flex:none;margin:3px 0 0;accent-color:var(--paper-ink)}
@@ -82,7 +82,7 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .practice{display:inline-block;background:var(--stamp);color:#fff;font-size:11px;padding:0 6px;margin-left:6px;vertical-align:middle}
 .doc .result{background:#efe4c8;padding:8px 10px;margin:10px 0;font-size:14px}
 .aicta{display:block;margin:10px 0;padding:10px 12px;background:#e2a83c;color:#1b1f3a;border:3px solid #0e1024;box-shadow:3px 3px 0 #0e1024;font-weight:700;text-decoration:none;font-size:15px;line-height:1.4}
-.aicta small{display:block;font-weight:400;font-size:12px;margin-top:2px}
+.aicta small{display:block;font-weight:400;font-size:13px;margin-top:2px}
 .aicta[hidden]{display:none}
 .msgs .aicta{margin:4px 0 8px;font-size:14px}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
@@ -129,8 +129,8 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .phone input:focus{outline:none;border-color:var(--brass)}
 .phone button[type=submit]{font:inherit;font-weight:700;background:var(--brass);color:#1b1f3a;border:0;padding:0 12px;cursor:pointer}
 @media (max-width:480px){.text{font-size:15px}.cards,.stats{grid-template-columns:1fr}.board{font-size:9px}.board .v{font-size:15px}
-  /* 手機：重要提醒（示範表單、隱私）不小於 13px；按鈕和選項高度接近 40px */
-  .note,.doc .sub,.doc .fine,.aicta small,.chip,.phone .more,.snd{font-size:13px}
+  /* 手機：按鈕和選項高度接近 40px（重要提醒的 13px 在上面，電腦和手機都適用） */
+  .chip,.phone .more,.snd{font-size:13px}
   .practice{font-size:12px}
   .doc label{padding:9px 0}
   .snd,.chip{padding:6px 10px}
@@ -472,7 +472,7 @@ async function story(){
   st.votes=null; st.road={ph:0,from:0,at:0};
   if(!started){ started=true; scene('home','你家客廳',1);
     const how=await modal(`<h3>這次換你判</h3><div class="sub">國民法官 AI 預演室（非官方競賽原型）</div>
-      <p style="font-size:14px">收到國民法官的通知了嗎？你可以先花 10 分鐘走一遍從選任到評議的過程，也可以直接看懂調查表怎麼填。遊戲裡的選擇都是練習，不會送出。真正回覆法院，請用通知書上的 QR code 填官方線上調查表。</p>
+      <p style="font-size:14px">收到國民法官的通知了嗎？你可以先花 10 分鐘走一遍從選任到評議的過程，也可以直接看懂調查表怎麼填。遊戲裡的選擇都是練習，不會送出。真正回覆法院，請依通知書上的說明填官方調查表（例如用手機掃 QR code）；不會操作或掃不了，可以打電話問通知書上的承辦法院。</p>
       <div class="row"><button class="btn" data-close="play">先體驗（約 10 分鐘）</button><button class="btn alt" data-close="reply">看懂調查表、試填一次</button></div>`);
     if(how==='reply'){ await surveyModal('看懂了，下一步：試填一次'); await replyFlow(); await say('旁白','想了解當國民法官會經歷什麼，可以繼續往下體驗。'); } }
   // 1
@@ -600,7 +600,7 @@ async function story(){
   else await modal(`<h3>${fin===2?'還有顧慮嗎？':'出發前，做一份你的專屬準備'}</h3><div class="sub">AI 依你的狀況整理重點，只引用司法院常見問答</div>
     <a class="aicta" href="${PARTYROCK}" target="_blank" rel="noopener">🤖 ${fin===2?'告訴 AI 你在擔心什麼，幫你逐一解答':'讓 AI 幫我做到庭準備清單（交通、請假、補助）'} ↗<small>另開 PartyRock（需登入）。用白話描述狀況就好，不要輸入姓名、身分證字號等認得出你的資料</small></a>
     <button class="btn alt" data-close="1">先不用，繼續</button>`);
-  const go=await ask('旁白','提醒你：剛剛遊戲裡的所有選擇都是練習，不會送到法院。如果你真的收到通知，請用通知書上的 QR code 填官方線上調查表。要先在這裡試填一次、看懂每一題嗎？',['試填一次（示範）','先不用']);
+  const go=await ask('旁白','提醒你：剛剛遊戲裡的所有選擇都是練習，不會送到法院。如果你真的收到通知，請依通知書上的說明填官方調查表（例如用手機掃 QR code）。要先在這裡試填一次、看懂每一題嗎？',['試填一次（示範）','先不用']);
   if(go===0) await replyFlow();
   await ask('旁白','謝謝你走完這次預演。',['再玩一次']);
   story();
@@ -659,8 +659,8 @@ const REASON_EG=['例如：民國 44 年次，今年 71 歲。（附身分證影
 async function replyFlow(){
   while(true){
     const r=await realReply();
-    if(r==='1'){ await say('旁白','示範表單已經在新分頁打開，內容都幫你填好了。按表單最下面的「提交」，就能在示範的法院端儀表板看到這筆回覆。\n真的收到通知時，請用通知書上的 QR code 填官方線上調查表。'); return true; }
-    if(r==='2'){ await say('旁白','示範表單已經在新分頁打開，編號和事由都幫你填好了。說明已經複製，請貼在最後一題，再按表單最下面的「提交」。\n真的收到通知時，請用通知書上的 QR code 填官方線上調查表。'); return true; }
+    if(r==='1'){ await say('旁白','示範表單已經在新分頁打開，內容都幫你填好了。按表單最下面的「提交」，就能在示範的法院端儀表板看到這筆回覆。\n真的收到通知時，請依通知書上的說明填官方調查表（例如用手機掃 QR code）。'); return true; }
+    if(r==='2'){ await say('旁白','示範表單已經在新分頁打開，編號和事由都幫你填好了。說明已經複製，請貼在最後一題，再按表單最下面的「提交」。\n真的收到通知時，請依通知書上的說明填官方調查表（例如用手機掃 QR code）。'); return true; }
     const again=await ask('旁白','你取消了回覆，沒有送出任何資料。',['重新填寫','先不用']);
     if(again===1) return false;
   }
@@ -759,7 +759,8 @@ async function send(q){
 }
 /* 語意搜尋：在瀏覽器裡跑小型中文向量模型，不需登入或伺服器 */
 let SEM=null, semState='idle';
-const SEM_MODEL='Xenova/bge-small-zh-v1.5';
+// 語意模型：設定與門檻在 lib/qa-search.js 的 MODELS（npm run eval:qa 量出來的）。換模型只要改這一行。
+const SEM_CFG=QASearch.MODELS.bge;
 function modeLabel(){
   if(sampleFn) return 'AI 模式：只依司法院常見問答回答，附出處';
   if(SEM) return `語意搜尋模式：瀏覽器內 AI 模型比對 ${ENTRIES.length} 題常見問答，附出處`;
@@ -772,11 +773,11 @@ async function loadSemantic(){
   semState='loading'; refreshMode();
   try{
     const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2');
-    const ext=await T.pipeline('feature-extraction',SEM_MODEL,{dtype:'q8'});
+    const ext=await T.pipeline('feature-extraction',SEM_CFG.id,{dtype:'q8'});
     const texts=[]; ENTRIES.forEach(e=>[e.q,...e.alt.split('｜')].filter(Boolean).forEach(s=>texts.push([e,s])));
     const items=[];
     for(let i=0;i<texts.length;i+=16){
-      const part=texts.slice(i,i+16), out=await ext(part.map(x=>x[1]),{pooling:'cls',normalize:true}), dim=out.dims[1];
+      const part=texts.slice(i,i+16), out=await ext(part.map(x=>SEM_CFG.prefix+x[1]),{pooling:SEM_CFG.pooling,normalize:true}), dim=out.dims[1];
       part.forEach(([e],k)=>items.push({e,v:out.data.slice(k*dim,(k+1)*dim)}));
     }
     SEM={ext,items}; semState='ready';
@@ -785,9 +786,9 @@ async function loadSemantic(){
 }
 // 語意分數：每一題取「題目＋口語問法」裡最像的那一句；排序與回答方式在 QASearch.hybridAnswer
 async function semAnswer(q){
-  const out=await SEM.ext(q,{pooling:'cls',normalize:true}), v=out.data, best=new Map();
+  const out=await SEM.ext(SEM_CFG.prefix+q,{pooling:SEM_CFG.pooling,normalize:true}), v=out.data, best=new Map();
   SEM.items.forEach(({e,v:w})=>{ let s=0; for(let i=0;i<v.length;i++) s+=v[i]*w[i]; if(s>(best.get(e)||0)) best.set(e,s); });
-  return QASearch.hybridAnswer(ENTRIES,best,q);
+  return QASearch.hybridAnswer(ENTRIES,best,q,SEM_CFG);
 }
 $('moreAi').href=PARTYROCK;
 setMode('qa');
