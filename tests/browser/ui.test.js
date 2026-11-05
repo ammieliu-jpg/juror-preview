@@ -5,7 +5,8 @@
 // 需要 Playwright（不放進 package.json，平常的 npm test 仍然不用安裝任何套件）：
 //   npm i --no-save playwright@1.63.0 && npx playwright install chromium
 //
-// 民眾端用手機尺寸完整檢查；法院端是書記官在電腦上用的工作頁，用電腦尺寸檢查，手機上只確認不出錯。
+// 民眾端：大多數人用手機掃 QR code，但也有人會在電腦上輸入網址，所以手機和筆電尺寸都檢查。
+// 法院端是書記官在電腦上用的工作頁：用電腦尺寸檢查，手機上只確認不出錯。
 // 外部網路（字型、語意模型）一律擋掉：測試不靠網路，問答會走關鍵字比對。
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -17,6 +18,9 @@ const { chromium, devices } = require('playwright');
 const ROOT = path.join(__dirname, '..', '..');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const PHONES = ['iPhone SE', 'iPhone 13'];
+const LAPTOP = { viewport: { width: 1366, height: 768 } };
+/** 民眾端要檢查的裝置：[名稱, 裝置, 是否觸控（觸控才檢查按鈕和選項夠不夠大）] */
+const PUBLIC_DEVICES = [['iPhone SE', 'iPhone SE', true], ['iPhone 13', 'iPhone 13', true], ['筆電 1366×768', LAPTOP, false]];
 
 let server, base, browser;
 
@@ -65,8 +69,8 @@ const state = p => p.evaluate(() => {
 });
 const nextLine = p => p.evaluate(() => document.getElementById('dialog').click());
 
-/** 開著的文件視窗的版面檢查（手機尺寸）。回傳問題清單，空的才算通過。 */
-const docLayout = p => p.evaluate(() => {
+/** 開著的文件視窗的版面檢查。回傳問題清單，空的才算通過。touch：觸控裝置另外檢查按鈕和選項的大小。 */
+const docLayout = (p, touch = true) => p.evaluate(touch => {
   const out = [];
   const shown = el => el.getClientRects().length > 0;
   const doc = document.getElementById('doc');
@@ -75,7 +79,7 @@ const docLayout = p => p.evaluate(() => {
     const fs = parseFloat(getComputedStyle(el).fontSize);
     if (shown(el) && fs < 13) out.push(`字太小 ${fs}px：${el.textContent.trim().slice(0, 16)}`);
   }
-  for (const el of doc.querySelectorAll('label')) {
+  for (const el of touch ? doc.querySelectorAll('label') : []) {
     const h = el.getBoundingClientRect().height;
     if (shown(el) && h < 40) out.push(`選項太矮 ${Math.round(h)}px：${el.textContent.trim().slice(0, 16)}`);
   }
@@ -84,19 +88,21 @@ const docLayout = p => p.evaluate(() => {
     if (getComputedStyle(el).colorScheme !== 'light') out.push(`勾選框不是淺色樣式（沒勾的會顯示成深色方塊）：#${el.id}`);
     if (el.getBoundingClientRect().width < 18) out.push(`勾選框太小：#${el.id}`);
   }
-  for (const el of doc.querySelectorAll('button, a.btn')) {
+  for (const el of touch ? doc.querySelectorAll('button, a.btn') : []) {
     const h = el.getBoundingClientRect().height;
     if (shown(el) && h < 32) out.push(`按鈕太矮 ${Math.round(h)}px：${el.textContent.trim().slice(0, 16)}`);
   }
   return out;
-});
+}, touch);
 
 /* ---------- 民眾端（手機） ---------- */
 
-for (const phone of PHONES) {
-  test(`民眾端（${phone}）：看懂調查表 → 試填，版面與勾選框`, async () => {
-    const p = await open(phone, 'index.html');
-    assert.deepEqual(await docLayout(p), [], '開頭的說明');
+for (const [name, device, touch] of PUBLIC_DEVICES) {
+  test(`民眾端（${name}）：看懂調查表 → 試填，版面與勾選框`, async () => {
+    const p = await open(device, 'index.html');
+    assert.deepEqual(await docLayout(p, touch), [], '開頭的說明');
+    // 掃不了 QR code 的人也要知道怎麼辦
+    assert.match(await p.textContent('#doc'), /依通知書上的說明[\s\S]*承辦法院/);
     await p.click('#doc [data-close="reply"]');
 
     // 調查表說明：勾選後即時初篩
@@ -104,7 +110,7 @@ for (const phone of PHONES) {
     await p.check('#sv0');
     await p.check('#sv6');
     assert.match(await p.textContent('#svOut'), /不得擔任[\s\S]*得拒絕/);
-    assert.deepEqual(await docLayout(p), [], '調查表說明');
+    assert.deepEqual(await docLayout(p, touch), [], '調查表說明');
     await p.click('#doc [data-close="1"]');
 
     // 試填表單：勾選不能丟出錯誤（以前調查表的事件會留到這裡）
@@ -112,7 +118,7 @@ for (const phone of PHONES) {
     await p.check('#rp1');
     await p.check('#rr3');
     await p.check('#rr6');
-    assert.deepEqual(await docLayout(p), [], '試填表單');
+    assert.deepEqual(await docLayout(p, touch), [], '試填表單');
     assert.deepEqual(p.errors, []);
     await p.context().close();
   });
@@ -152,8 +158,8 @@ for (const phone of PHONES) {
   });
 }
 
-test('民眾端（iPhone SE）：從頭玩到結尾，沒有任何錯誤', async () => {
-  const p = await open('iPhone SE', 'index.html');
+for (const [name, device] of [['iPhone SE', 'iPhone SE'], ['筆電 1366×768', LAPTOP]]) test(`民眾端（${name}）：從頭玩到結尾，沒有任何錯誤`, async () => {
+  const p = await open(device, 'index.html');
   const AVOID = /重播|重新填寫|不表態|再玩一次/; // 會繞回原處的選項
   const stages = new Set();
   let done = false;
