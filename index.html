@@ -759,7 +759,8 @@ async function send(q){
 }
 /* 語意搜尋：在瀏覽器裡跑小型中文向量模型，不需登入或伺服器 */
 let SEM=null, semState='idle';
-const SEM_MODEL='Xenova/bge-small-zh-v1.5';
+// 語意模型：設定與門檻在 lib/qa-search.js 的 MODELS（npm run eval:qa 量出來的）。換模型只要改這一行。
+const SEM_CFG=QASearch.MODELS.bge;
 function modeLabel(){
   if(sampleFn) return 'AI 模式：只依司法院常見問答回答，附出處';
   if(SEM) return `語意搜尋模式：瀏覽器內 AI 模型比對 ${ENTRIES.length} 題常見問答，附出處`;
@@ -772,11 +773,11 @@ async function loadSemantic(){
   semState='loading'; refreshMode();
   try{
     const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2');
-    const ext=await T.pipeline('feature-extraction',SEM_MODEL,{dtype:'q8'});
+    const ext=await T.pipeline('feature-extraction',SEM_CFG.id,{dtype:'q8'});
     const texts=[]; ENTRIES.forEach(e=>[e.q,...e.alt.split('｜')].filter(Boolean).forEach(s=>texts.push([e,s])));
     const items=[];
     for(let i=0;i<texts.length;i+=16){
-      const part=texts.slice(i,i+16), out=await ext(part.map(x=>x[1]),{pooling:'cls',normalize:true}), dim=out.dims[1];
+      const part=texts.slice(i,i+16), out=await ext(part.map(x=>SEM_CFG.prefix+x[1]),{pooling:SEM_CFG.pooling,normalize:true}), dim=out.dims[1];
       part.forEach(([e],k)=>items.push({e,v:out.data.slice(k*dim,(k+1)*dim)}));
     }
     SEM={ext,items}; semState='ready';
@@ -785,9 +786,9 @@ async function loadSemantic(){
 }
 // 語意分數：每一題取「題目＋口語問法」裡最像的那一句；排序與回答方式在 QASearch.hybridAnswer
 async function semAnswer(q){
-  const out=await SEM.ext(q,{pooling:'cls',normalize:true}), v=out.data, best=new Map();
+  const out=await SEM.ext(SEM_CFG.prefix+q,{pooling:SEM_CFG.pooling,normalize:true}), v=out.data, best=new Map();
   SEM.items.forEach(({e,v:w})=>{ let s=0; for(let i=0;i<v.length;i++) s+=v[i]*w[i]; if(s>(best.get(e)||0)) best.set(e,s); });
-  return QASearch.hybridAnswer(ENTRIES,best,q);
+  return QASearch.hybridAnswer(ENTRIES,best,q,SEM_CFG);
 }
 $('moreAi').href=PARTYROCK;
 setMode('qa');

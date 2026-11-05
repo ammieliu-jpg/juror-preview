@@ -217,3 +217,25 @@ test('法院端（iPhone SE）：打得開、不出錯', async () => {
   assert.deepEqual(p.errors, []);
   await p.context().close();
 });
+
+for (const file of ['import-utf8.csv', 'import-big5.csv']) {
+  test(`法院端（電腦）：匯入官方匯出的表格（${file}），只在本機用規則判、不送 AI`, async () => {
+    const p = await open({ viewport: { width: 1280, height: 800 } }, 'court.html');
+    const outside = [];
+    p.on('request', r => { if (!r.url().startsWith(base)) outside.push(r.url()); });
+    // 就算填了 Gemini 金鑰，匯入的資料也不能送出去
+    await p.evaluate(() => sessionStorage.setItem('court:apiKey', JSON.stringify('test-key')));
+    await p.reload();
+    outside.length = 0;
+    await p.setInputFiles('#importFile', path.join(ROOT, 'tests', 'fixtures', file));
+    await p.waitForFunction(() => /已匯入/.test(document.getElementById('status').textContent));
+    assert.match(await p.textContent('#status'), /4 列.*不會上傳/);
+    const rows = await p.$$eval('#rows tr', trs => trs.map(t => t.innerText.replace(/\s+/g, ' ')));
+    assert.equal(rows.length, 2, '兩筆申請免除（標題是「回覆意願」、內容是「申請拒絕被選任」）');
+    assert.ok(rows.some(t => /C201.*年滿七十歲以上.*規則判.*核對身分證明後送法官/.test(t)), rows.join('\n'));
+    assert.ok(rows.some(t => /C203.*待 AI.*不送 AI/.test(t)), rows.join('\n'));
+    assert.deepEqual(outside.filter(u => /generativelanguage|script\.google|docs\.google/.test(u)), [], '匯入的資料不能送到外部');
+    assert.deepEqual(p.errors, []);
+    await p.context().close();
+  });
+}

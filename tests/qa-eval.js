@@ -27,10 +27,8 @@ const { KB, ALT } = loadKB();
 const entries = Q.parseEntries(KB, ALT);
 const inScope = questions.filter(x => x.expect), outScope = questions.filter(x => !x.expect);
 
-const MODELS = {
-  bge: { id: 'Xenova/bge-small-zh-v1.5', pooling: 'cls', prefix: '' },
-  e5: { id: 'Xenova/multilingual-e5-small', pooling: 'mean', prefix: 'query: ' }, // e5 要加前綴；問題對問題屬於對稱比對，兩邊都用 query:
-};
+// 模型設定與門檻和 index.html 共用（lib/qa-search.js 的 MODELS）。e5 要加前綴；問題對問題屬於對稱比對，兩邊都用 query:
+const MODELS = Q.MODELS;
 
 /** 每題的最佳候選：[{x, top, score}] */
 function keywordPicks() {
@@ -120,15 +118,24 @@ function sizes(dir) {
     console.log(`（${k} 載入與計算 ${((Date.now() - t0) / 1000).toFixed(1)} 秒）`);
   }
   console.log('');
-  report('bge（目前，門檻 0.60）', results.bge, Q.SEM_MIN, 'index.html 目前的設定');
-  const bb = bestThreshold(results.bge, 0.4, 0.95);
-  report('bge（掃描最佳門檻）', results.bge, bb.th);
-  const be = bestThreshold(results.e5, 0.6, 0.98);
-  report('e5（掃描最佳門檻）', results.e5, be.th, 'e5 的分數普遍偏高，0.60 不適用');
+  report('bge（舊門檻 0.60）', results.bge, Q.SEM_MIN, '舊版 index.html');
+  for (const k of Object.keys(MODELS)) {
+    report(`${k}（設定的門檻）`, results[k], MODELS[k].min, `${MODELS[k].maker}，約 ${MODELS[k].mb} MB`);
+    const b = bestThreshold(results[k], 0.4, 0.99);
+    report(`${k}（掃描最佳門檻）`, results[k], b.th);
+  }
   console.log('');
   misses('keyword', kw, Q.KEYWORD_MIN);
-  misses('bge', results.bge, Q.SEM_MIN);
-  misses('e5', results.e5, be.th);
+  for (const k of Object.keys(MODELS)) misses(k, results[k], MODELS[k].min);
+  // 「我不太確定」的門檻：過了 min 的回答裡，分數低於 sure 的會加上「我不太確定」並附第二個候選
+  console.log('\n「我不太確定」門檻（過了 min 的回答中：對的被標不確定／錯的卻沒標）：');
+  for (const k of Object.keys(MODELS)) {
+    const ans = results[k].filter(p => p.x.expect && p.score >= MODELS[k].min);
+    const ok = p => p.x.expect.includes(p.top.id);
+    const line = [];
+    for (let s = MODELS[k].min; s <= 1.02; s += 0.01) line.push(`${s.toFixed(2)}:${ans.filter(p => ok(p) && p.score < s).length}/${ans.filter(p => !ok(p) && p.score >= s).length}`);
+    console.log(`  ${k}（設定 ${MODELS[k].sure}） ${line.join(' ')}`);
+  }
   console.log('\n模型檔大小：', sizes(T.env.cacheDir));
   console.log('\n注意：門檻是在同一份題目上掃描的，正式採用前要再用另一份題目確認。');
 })().catch(err => { console.error(err); process.exitCode = 1; });

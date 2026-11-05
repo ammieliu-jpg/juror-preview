@@ -5,7 +5,10 @@
  * 書記官每天打開的工作頁：讀取民眾的回覆，統計出席，並列出免除申請的初篩結果。
  * 初篩邏輯在 lib/screening.js（和 Apps Script 共用），這裡只負責讀資料、快取和畫面。
  *
- * 資料來源（設定裡三選一）：
+ * 資料來源：
+ *   - 匯入表格檔（「匯入表格檔」按鈕）：官方系統匯出的 CSV。只在這台電腦處理、不上傳，也不送 AI（只用規則判）。
+ *     這是不必改官方系統、也不必知道它內部怎麼做的導入方式（docs/INTEGRATION.md）。
+ * 設定裡的資料來源（二選一）：
  *   - Apps Script 網頁應用程式（建議）：試算表維持私人，court.html 用存取碼讀「已分類」的結果，
  *     不需要在瀏覽器放 Gemini 金鑰。
  *   - 公開試算表 CSV（舊做法）：試算表要設成「知道連結的人可檢視」，只能放虛構資料。
@@ -86,7 +89,8 @@
   // 快取綁規則版本：lib/screening.js 改了規則，舊的分類結果就不用
   var CACHE_KEY = 'cache:' + S.RULES_VERSION;
   var cache = local.get(CACHE_KEY, {});
-  var rows = [], seen = null, timer = null, running = false, isDemo = false;
+  // mode：remote（設定裡的資料來源）｜demo（示範資料）｜file（匯入的表格檔，只在本機處理）
+  var rows = [], seen = null, timer = null, running = false, mode = 'remote';
   // Apps Script 回報的規則版本。和這一頁的不同，代表有人改了 lib/screening.js 卻還沒重新部署 Apps Script（或反過來）
   var remoteVersion = null;
   // 書記官看過實際附件後打勾；沒打勾的「核對附件後送法官」不算完成
@@ -164,24 +168,49 @@
 
   async function load(fromDemo) {
     try {
-      isDemo = !!fromDemo;
       var all, msg;
       remoteVersion = null;
       if (fromDemo) { all = DEMO.map(function (r) { return Object.assign({}, r); }); msg = '示範資料（虛構）'; }
       else { $('status').textContent = '讀取中……'; all = await fetchRows(); msg = '已更新 ' + new Date().toLocaleTimeString('zh-TW', { hour12: false }); }
-      var latest = latestPerId(all);
-      rows = latest.rows;
-      $('status').textContent = msg + (latest.dropped ? '（有 ' + latest.dropped + ' 筆是同一人重複送出，以最後一次為準）' : '');
-      $('verWarn').hidden = !remoteVersion || remoteVersion === S.RULES_VERSION;
-      $('verWarn').textContent = '⚠ 規則版本不一致：Apps Script 是 ' + remoteVersion + '，這一頁是 ' + S.RULES_VERSION +
-        '。兩邊的判斷可能不同。請把 apps-script/Code.gs 重新貼進 Apps Script，部署新版本，再按選單「分類所有尚未處理的申請」重判舊版規則判的申請。';
-      // 網頁應用程式模式：Apps Script 已經分類好的，直接用
-      rows.forEach(function (r) { var c = fromSheet(r.ai); if (c) cache[keyOf(r)] = c; });
-      render(); classifyAll();
+      show(all, msg, fromDemo ? 'demo' : 'remote');
     } catch (err) {
       $('status').textContent = '讀取失敗：' + err.message;
       if (!fromDemo) $('settings').open = true;
     }
+  }
+
+  /** 讀到的資料列 → 去重、顯示、分類。三種來源（設定、示範、匯入）共用。 */
+  function show(all, msg, m) {
+    mode = m;
+    if (m !== 'remote') remoteVersion = null;
+    var latest = latestPerId(all);
+    rows = latest.rows;
+    $('status').textContent = msg + (latest.dropped ? '（有 ' + latest.dropped + ' 筆是同一人重複送出，以最後一次為準）' : '');
+    $('verWarn').hidden = !remoteVersion || remoteVersion === S.RULES_VERSION;
+    $('verWarn').textContent = '⚠ 規則版本不一致：Apps Script 是 ' + remoteVersion + '，這一頁是 ' + S.RULES_VERSION +
+      '。兩邊的判斷可能不同。請把 apps-script/Code.gs 重新貼進 Apps Script，部署新版本，再按選單「分類所有尚未處理的申請」重判舊版規則判的申請。';
+    // 網頁應用程式模式：Apps Script 已經分類好的，直接用
+    rows.forEach(function (r) { var c = fromSheet(r.ai); if (c) cache[keyOf(r)] = c; });
+    render(); classifyAll();
+  }
+
+  /**
+   * 匯入的表格檔 → 二維陣列。先當 UTF-8 讀；不是合法的 UTF-8 就當 Big5（Excel「另存 CSV」在繁中 Windows 常是 Big5）。
+   * Tab 分隔的檔案也讀得懂。
+   */
+  async function readTable(file) {
+    var buf = await file.arrayBuffer(), text;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { text = new TextDecoder('big5').decode(buf); }
+    text = text.replace(/^\uFEFF/, '');
+    var first = text.split(/\r?\n/, 1)[0];
+    return S.parseCSV(text, /\t/.test(first) && !/,/.test(first) ? '\t' : ',');
+  }
+
+  /** AI 的結果才值得存（規則每次重算都一樣，也不必把規則判的理由留在瀏覽器裡）。 */
+  function aiOnly(c) {
+    var out = {};
+    Object.keys(c).forEach(function (k) { if (c[k] && c[k].src === 'ai') out[k] = c[k]; });
+    return out;
   }
 
   /* ---------- 畫面 ---------- */
@@ -241,8 +270,9 @@
   async function classifyAll() {
     if (running) return; running = true;
     try {
-      var fromWebapp = cfg.source === 'webapp' && !isDemo;
-      var useAI = !!apiKey && !fromWebapp; // 網頁應用程式模式由 Apps Script 負責 AI
+      var fromWebapp = cfg.source === 'webapp' && mode === 'remote';
+      // 網頁應用程式模式由 Apps Script 負責 AI；匯入的表格只在本機處理，不送 AI
+      var useAI = !!apiKey && !fromWebapp && mode !== 'file';
       var list = rows.filter(isEx);
       for (var i = 0; i < list.length; i++) {
         var r = list[i], k = keyOf(r);
@@ -252,8 +282,8 @@
         if (useAI) {
           try { out = S.checkAI(S.parseJson(await gemini(S.buildPrompt(r))), r); }
           catch (err) { $('status').textContent = 'AI 失敗：' + err.message; out = S.pendingResult('請人工審閱（AI 暫時無法使用）'); }
-        } else out = S.pendingResult(fromWebapp ? 'Apps Script 尚未分類，請稍後重新整理' : undefined);
-        cache[k] = out; if (out.src === 'ai') local.set(CACHE_KEY, cache); render();
+        } else out = S.pendingResult(fromWebapp ? 'Apps Script 尚未分類，請稍後重新整理' : mode === 'file' ? '請人工審閱（匯入的資料只在本機用規則判，不送 AI）' : undefined);
+        cache[k] = out; if (out.src === 'ai') local.set(CACHE_KEY, aiOnly(cache)); render();
         if (useAI) await sleep(1200);
       }
     } finally { running = false; }
@@ -293,6 +323,17 @@
     $('status').textContent = '已清除這台電腦上的設定、存取碼與金鑰';
   };
   $('clearCache').onclick = function () { cache = {}; local.set(CACHE_KEY, cache); render(); classifyAll(); };
+  $('importFile').onchange = async function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try {
+      var t = S.rowsFromTable(await readTable(f));
+      if (!t.rows.length) throw new Error('檔案裡沒有資料列');
+      clearInterval(timer); $('auto').checked = false; // 自動更新會改讀設定裡的資料來源，蓋掉匯入的資料
+      show(t.rows, '已匯入「' + f.name + '」' + t.rows.length + ' 列，只在這台電腦處理，不會上傳' + (t.fallback ? '（標題認不出來，照 A–E 欄的順序讀）' : ''), 'file');
+    } catch (err) { $('status').textContent = '匯入失敗：' + err.message; }
+    e.target.value = '';
+  };
   $('refresh').onclick = function () { load(); };
   $('demo').onclick = function () { load(true); };
   $('sumBtn').onclick = summary;
