@@ -81,7 +81,14 @@ npm run eval      # 規則層準確度評估
 npm run check     # 檢查 Code.gs 有沒有同步＋跑測試（push 前跑這個）
 ```
 
-GitHub Actions（`.github/workflows/test.yml`）每次 push 和開 PR 都會自動跑 `npm run check` 與 `npm run eval`。
+GitHub Actions（`.github/workflows/test.yml`）每次 push 和開 PR 都會自動跑 `npm run check`、`npm run eval`，以及另一個 job 跑瀏覽器測試（`npm run test:browser`）。
+
+瀏覽器測試要先裝 Playwright（只有這份測試需要，所以不寫進 `package.json`）：
+
+```bash
+npm i --no-save playwright@1.63.0 && npx playwright install chromium
+npm run test:browser   # 8 項，約 10 秒
+```
 
 ### 測試檔案
 
@@ -92,6 +99,7 @@ GitHub Actions（`.github/workflows/test.yml`）每次 push 和開 PR 都會自�
 | `tests/apps-script.test.js` | Apps Script 整體流程 | 用假的 `SpreadsheetApp` 在 Node 裡跑 `onFormSubmit`、`doGet`、`rebuildDashboard` |
 | `tests/build.test.js` | `Code.gs` 是否同步、HTML 引用的檔案是否存在 | |
 | `tests/eval-rules.js` | 準確度評估（不是 pass/fail 測試） | 覆蓋率、正確率、誤放行數 |
+| `tests/browser/ui.test.js` | 用真的 Chromium 操作網頁（單元測試考不到的畫面問題） | 手機尺寸：勾選框是淺色樣式、提醒文字不小於 13px、選項不矮於 40px、印章不蓋住標題、問答回答從開頭顯示、從頭玩到結尾沒有錯誤；電腦尺寸：法院端示範資料、附件勾選、摘要 |
 
 ### 範例 1：純函式（最簡單）
 
