@@ -69,6 +69,9 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .doc .btn{font:inherit;font-weight:700;background:var(--paper-ink);color:var(--paper);border:0;padding:8px 16px;cursor:pointer;margin-top:6px}
 .doc .btn:focus-visible{outline:3px solid var(--brass)}
 .doc .fine{font-size:12px;color:#7a6a55}
+/* 文件是淺色底：原生勾選框要用淺色樣式，否則沿用 :root 的 dark，沒勾的也是實心深色方塊，看起來像已勾選 */
+.doc{color-scheme:light}
+.doc input[type=checkbox],.doc input[type=radio]{width:18px;height:18px;flex:none;margin:3px 0 0;accent-color:var(--paper-ink)}
 .doc label{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:14px;cursor:pointer}
 .doc .field{display:block;font-size:14px;margin:10px 0 4px;font-weight:700}
 .doc input[type=text],.doc textarea{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:6px 8px;border:2px solid var(--paper-ink);background:#fff;color:var(--paper-ink)}
@@ -125,7 +128,19 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .phone input{flex:1;min-width:0;font:inherit;font-size:15px;background:var(--ink);color:var(--paper);border:2px solid var(--ink2);padding:6px 8px}
 .phone input:focus{outline:none;border-color:var(--brass)}
 .phone button[type=submit]{font:inherit;font-weight:700;background:var(--brass);color:#1b1f3a;border:0;padding:0 12px;cursor:pointer}
-@media (max-width:480px){.text{font-size:15px}.cards,.stats{grid-template-columns:1fr}.board{font-size:9px}.board .v{font-size:15px}}
+@media (max-width:480px){.text{font-size:15px}.cards,.stats{grid-template-columns:1fr}.board{font-size:9px}.board .v{font-size:15px}
+  /* 手機：重要提醒（示範表單、隱私）不小於 13px；按鈕和選項高度接近 40px */
+  .note,.doc .sub,.doc .fine,.aicta small,.chip,.phone .more,.snd{font-size:13px}
+  .practice{font-size:12px}
+  .doc label{padding:9px 0}
+  .snd,.chip{padding:6px 10px}
+  .phone .x{padding:6px 10px;font-size:24px}
+  /* 建議問題排成一列左右滑，回答區多一點高度 */
+  .chips{flex-wrap:nowrap;overflow-x:auto}
+  .chip{flex:none}
+  /* 通知書的印章在窄螢幕會蓋住標題：改放在標題上方 */
+  .doc .seal{position:static;margin:0 auto 8px}
+}
 @media (prefers-reduced-motion:reduce){.next{animation:none}}
 </style>
 
@@ -427,7 +442,8 @@ function ask(who,text,opts){ return new Promise(res=>{
 })}
 function scene(bg,place,stage){ if(bg!=='road'){SFX.rainOff();SFX.engine(null)} else SFX.rainOn(); if(bg==='court'&&st.bg!=='court')SFX.gavel(3); st.bg=bg; $('place').textContent=place; if(stage)setStage(stage); $('caption').hidden=true; }
 function caption(t){ const c=$('caption'); if(!t){c.hidden=true;return} c.textContent=t; c.hidden=false; }
-function modal(html,bind){ SFX.paper(); return new Promise(res=>{ $('doc').innerHTML=html; $('modal').hidden=false;
+// 每次換一個新的 #doc：上一份文件 bind 加的事件不會留到下一份（以前調查表的 change 事件會在試填表單裡出錯）
+function modal(html,bind){ SFX.paper(); return new Promise(res=>{ const old=$('doc'), fresh=old.cloneNode(false); old.replaceWith(fresh); fresh.innerHTML=html; $('modal').hidden=false;
   const close=v=>{$('modal').hidden=true;res(v)}; bind&&bind($('doc'),close);
   $('doc').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>close(b.dataset.close));
   $('doc').querySelector('button,input')?.focus({preventScroll:true}); })}
@@ -737,6 +753,8 @@ async function send(q){
     else { out.textContent='AI 評議室暫時無法使用，請關閉手機，繼續劇本評議。'; delibHist.pop(); }
     if(err&&err.code==='not_granted'){ sampleFn=null; setMode('qa'); }
   }
+  // 回答的開頭捲到最上面：小螢幕上原本只看得到回答的前兩行
+  const m=$('msgs'); if(out.isConnected) m.scrollTop=Math.max(0,out.offsetTop-m.offsetTop-8);
   busy=false;
 }
 /* 語意搜尋：在瀏覽器裡跑小型中文向量模型，不需登入或伺服器 */

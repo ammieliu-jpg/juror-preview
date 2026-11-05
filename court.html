@@ -77,6 +77,8 @@ label.doc.done{color:var(--ok)}
 .empty{color:var(--mute);padding:20px 0;text-align:center}
 .warnbox{border-color:var(--warn);color:var(--warn);font-size:14px}
 @media (prefers-reduced-motion:reduce){tr.new td{animation:none}}
+/* 手機：KPI 兩欄並排，不必滑過七張大卡片才看到待審清單 */
+@media (max-width:480px){.kpis{grid-template-columns:1fr 1fr;gap:8px}.kpi{padding:10px 12px}.kpi b{font-size:22px}}
 </style>
 </head>
 <body>
