@@ -1,5 +1,19 @@
 # 修改紀錄
 
+## 2026-11-05　問答評估、匯入表格檔、介接規格
+
+**問答小幫手**
+- 新增評估（`npm run eval:qa`、GitHub Actions `qa-eval`）：55 題換過說法的問題＋10 題資料庫沒有的問題，比較只用關鍵字、bge-small-zh、multilingual-e5-small
+- 修正：舊門檻 0.60 會把資料庫沒有的問題配上不相干的答案（10 題中 6 題）。改成 0.72，「我不太確定」改成 0.85：答錯的都會先提醒
+- 模型設定與門檻集中在 `lib/qa-search.js` 的 `MODELS`；換模型只改 `index.html` 一行。比較結果見 docs/REFACTORING.md
+
+**法院端**
+- 「匯入表格檔（CSV）」：官方系統匯出的表格，用標題找欄位，UTF-8／Big5 都可以；只在本機用規則判，不上傳、不送 AI
+- 分類快取只存 AI 的結果
+
+**文件**
+- docs/INTEGRATION.md：介接規格、三種接法、導入前要和司法院確認的事
+
 ## 2026-11-05　瀏覽器測試、電腦版民眾端
 
 - 新增 `tests/browser/ui.test.js`（`npm run test:browser`）：用真的 Chromium 操作網頁，GitHub Actions 每次 push 自動跑
