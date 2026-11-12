@@ -394,7 +394,7 @@ var Screening = (function () {
   'use strict';
 
   /** 規則或提示詞有改，就把版本加一；court.html 的快取會因此失效重算。 */
-  var RULES_VERSION = '2026-11-04.2';
+  var RULES_VERSION = '2026-11-12';
 
   /* ------------------------------------------------------------------
    * 事由清單與 AI 提示詞
@@ -500,12 +500,13 @@ var Screening = (function () {
   }
 
   /** [事由關鍵字, 可接受的附件, 給書記官看的說明] */
+  // 事由關鍵字也認得第 16 條的款號（AI 常只寫「第16條第4款」）
   var NEED_DOC = [
-    [/七十|70/, /身分證|戶口|戶籍/, '身分證明（身分證或戶口名簿）'],
-    [/學生|教師|老師/, /學生證|在學證明|教師證|在職證明|服務證明/, '學生證、在學證明或教師在職證明'],
-    [/疾病|傷害|身心|生理|心理/, /診斷|病歷|醫院|身心障礙/, '診斷證明書'],
-    [/看護|養育|照顧/, /診斷|戶口|戶籍|出生|身心障礙|病歷/, '被照顧者的診斷證明或戶籍資料'],
-    [/災/, /受災|災害/, '受災證明'],
+    [/七十|70|第1款/, /身分證|戶口|戶籍/, '身分證明（身分證或戶口名簿）'],
+    [/學生|教師|老師|第[23]款/, /學生證|在學證明|教師證|在職證明|服務證明/, '學生證、在學證明或教師在職證明'],
+    [/疾病|傷害|身心|生理|心理|第[45]款/, /診斷|病歷|醫院|身心障礙/, '診斷證明書'],
+    [/看護|養育|照顧|第6款/, /診斷|戶口|戶籍|出生|身心障礙|病歷/, '被照顧者的診斷證明或戶籍資料'],
+    [/災|第7款/, /受災|災害/, '受災證明'],
     [/職業|第14條|警察|軍人|法官|檢察官|律師|公務員/, /服務證|在職證明|職員證/, '服務證明']
   ];
 
@@ -728,6 +729,74 @@ var Screening = (function () {
   }
 
   /* ------------------------------------------------------------------
+   * 補件通知草稿（範本，不用 AI）
+   * ------------------------------------------------------------------ */
+
+  /*
+   * 需要補件的情況不用猜：第 16 條每一款事由都有對應的證明（NEED_DOC），只有三種情況要通知民眾：
+   *   1. 沒附證明　2. 附錯證明（finalize 標 docBad）　3. 說明不夠具體（AI建議「資料不足」）
+   * 不發通知：看起來不符合（由法院依程序處理）、只差書記官核對附件、編號有問題（法院內部核對）。
+   * 用固定範本而不是 AI：用語一致，書記官改好再寄。
+   */
+
+  /** 「資料不足」時，依事由要請民眾補充說明的項目。 */
+  var DETAIL_ASK = [
+    [/疾病|傷害|身心|生理|心理|健康|第[45]款/, ['病名或傷勢，以及目前的治療情形（例如手術、住院、復健）與預計期間', '醫師的建議（例如不宜久坐、不宜長時間外出）']],
+    [/看護|養育|照顧|第6款/, ['需要照顧的人是誰、和您的關係、目前的狀況', '為什麼需要由您照顧（例如沒有其他家人可以協助）']],
+    [/災|第7款/, ['受災的情形，以及正在處理的重建事務']],
+    [/生活上|工作上|家庭上|重大需要|第8款/, ['具體是什麼事，以及擔任國民法官會造成什麼困難']],
+    [/職業|第14條|警察|軍人|法官|檢察官|律師|公務|書記官/, ['服務單位、職稱與實際的職務內容']],
+    [/學生|教師|老師|學校|第[23]款/, ['學校名稱，以及您是在校學生或在職教師']],
+    [/七十|70|第1款/, ['出生年月日']]
+  ];
+
+  function firstMatch(list, text) {
+    for (var i = 0; i < list.length; i++) if (list[i][0].test(text)) return list[i];
+    return null;
+  }
+
+  /**
+   * 這筆申請要不要發補件通知；要的話回傳草稿。
+   * @param {object} c   finalize 之後的初篩結果（或 pendingResult）
+   * @param {{id:string, reasons:string, note:string}} app
+   * @returns {{items:string[], text:string}|null}
+   */
+  function noticeFor(c, app) {
+    if (!c || !app) return null;
+    var todo = String(c['書記官待辦'] || '');
+    if (c['AI建議'] === '看起來不符合' || c['需人工確認'] === '否' || /編號/.test(todo)) return null;
+    // 先看初篩對應的事由，對不上再看民眾勾選的事由
+    var mapped = c['對應事由'] && !/^(無|—)$/.test(c['對應事由']) ? c['對應事由'] : '', box = String(app.reasons || '');
+    var pick = function (list) { return (mapped && firstMatch(list, mapped)) || firstMatch(list, box); };
+    var need = pick(NEED_DOC), doc = claimedDoc(app.note), items = [];
+    if (c['AI建議'] === '資料不足') {
+      var ask = pick(DETAIL_ASK);
+      items = items.concat(ask ? ask[1] : ['您符合哪一款事由，以及實際的情況']);
+    }
+    // 沒附、或附錯（和 finalize 的附件核對同一套對照；AI 還沒判的申請也看得出來）
+    if (need && !doc) items.push(need[2]);
+    else if (need && !need[1].test(doc)) items.push(need[2] + '（您寫的附件是「' + doc + '」，和申請的事由不同）');
+    if (!items.length) return null;
+    return { items: items, text: noticeText(app, items) };
+  }
+
+  /** 補件通知的範本。【】是給法院填的空格。 */
+  function noticeText(app, items) {
+    return [
+      '候選國民法官 ' + String(app.id || '') + ' 您好：',
+      '',
+      '本院已收到您的回覆。您申請免除擔任國民法官' + (app.reasons ? '（勾選：' + String(app.reasons) + '）' : '') + '，為了讓法官審查，請補充下列資料：',
+      '',
+      items.map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n'),
+      '',
+      '請於【　年　月　日】前，以【回覆方式】提供。如有疑問，請洽【承辦股別、電話】。',
+      '是否准許免除，由法官決定。',
+      '',
+      '【法院名稱】　敬啟'
+    ].join('\n');
+  }
+
+  /* ------------------------------------------------------------------
    * 書記官摘要（純程式，不用 AI）
    * ------------------------------------------------------------------ */
 
@@ -879,7 +948,7 @@ var Screening = (function () {
     RULES_VERSION: RULES_VERSION, RULES_PROMPT: RULES_PROMPT, ENUMS: ENUMS, INJECT: INJECT, NEED_DOC: NEED_DOC,
     clean: clean, wrapInput: wrapInput, buildPrompt: buildPrompt, parseJson: parseJson,
     claimedDoc: claimedDoc, selfAge: selfAge, aboutOthers: aboutOthers, ruleClassify: ruleClassify, checkAI: checkAI,
-    pendingResult: pendingResult, finalize: finalize, summarize: summarize,
+    pendingResult: pendingResult, finalize: finalize, summarize: summarize, noticeFor: noticeFor,
     normalizeReply: normalizeReply, isPlausibleId: isPlausibleId, sanitizeCell: sanitizeCell,
     parseCSV: parseCSV, csvUrl: csvUrl, mapColumns: mapColumns, rowsFromTable: rowsFromTable
   };
