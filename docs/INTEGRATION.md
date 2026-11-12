@@ -45,6 +45,7 @@
 
 - `書記官待辦` 不會出現「可直接送法官」。最好的情況是「核對○○後送法官」：附件只是民眾在說明裡寫的字，要有人看到實際文件。
 - 結果只是初步整理，准不准由法官決定。
+- 需要補件的申請，`noticeFor(結果, 申請)` 會依事由產生補件通知草稿（固定範本，不用 AI）；期限、回覆方式、承辦資訊留【】給法院填。
 
 ---
 
@@ -87,6 +88,9 @@ async function screen(app, askCourtModel) {
   }
   return S.finalize(out, app);                                     // 欄位一致、附件種類核對
 }
+
+// 需要補件時產生通知草稿（沒附、附錯、說明不夠具體才有；其餘回傳 null）
+const notice = S.noticeFor(result, app);   // { items: [...], text: '候選國民法官 C201 您好：…' }
 ```
 
 法院的系統不是 JavaScript：照 [`tests/fixtures/exemptions.json`](../tests/fixtures/exemptions.json) 的 44 筆標註案例改寫，跑同一份案例，確認每一筆結果都一樣。

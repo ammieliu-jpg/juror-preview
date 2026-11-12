@@ -192,7 +192,7 @@ test('法院端（電腦）：示範資料、附件勾選、摘要', async () =>
   const p = await open({ viewport: { width: 1280, height: 800 } }, 'court.html');
   await p.click('#demo');
   await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 17);
-  assert.equal(await p.locator('.kpi').count(), 7);
+  assert.equal(await p.locator('.kpi').count(), 8);
   assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '頁面不能左右捲動');
   assert.equal(await p.isVisible('#verWarn'), false, '示範資料不比對規則版本');
   assert.equal(await p.isVisible('#sheetUrl'), false, '沒選到的資料來源欄位要藏起來');
@@ -202,6 +202,20 @@ test('法院端（電腦）：示範資料、附件勾選、摘要', async () =>
   assert.ok(before > 0, '要有「待核對附件」');
   await p.locator('#rows input[data-k]').first().check();
   assert.equal(await pending(), before - 1, '勾「我已看過附件」後待核對少一筆');
+
+  // 補件通知草稿：單筆、全部
+  assert.equal(await p.isVisible('#noticePanel'), false);
+  await p.locator('#rows tr', { hasText: 'C123' }).locator('.notice-btn').click();
+  const one = await p.inputValue('#noticeText');
+  assert.match(one, /^候選國民法官 C123 您好/);
+  assert.match(one, /身分證明/);
+  assert.ok(!one.includes('C055'), '單筆只產生那一筆');
+  const kpiNotice = Number(await p.locator('.kpi', { hasText: '需補件' }).locator('b').textContent());
+  assert.equal(await p.locator('.notice-btn').count(), kpiNotice);
+  await p.click('#noticeAll');
+  const all = await p.inputValue('#noticeText');
+  assert.equal((all.match(/候選國民法官 C\d+ 您好/g) || []).length, kpiNotice, '全部產生的份數和「需補件」一樣');
+  assert.ok(!/C055|C107/.test(all), '只差核對附件的不發補件通知');
 
   await p.click('#sumBtn');
   assert.match(await p.textContent('#summary'), /^共 17 筆免除申請/);

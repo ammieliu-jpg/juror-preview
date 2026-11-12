@@ -187,3 +187,36 @@ test('匯入的範例檔：UTF-8 和 Big5 內容相同', () => {
   assert.equal(u.rows.length, 4);
   assert.deepEqual(b.rows, u.rows);
 });
+
+test('noticeFor：只有沒附、附錯、說明不夠具體的才發補件通知', () => {
+  const rule = app => S.finalize(S.ruleClassify(app, OPTS), app);
+  const ai = (o, app) => S.finalize(S.checkAI(o, app), app);
+  // 沒附證明（規則判）
+  const c123 = { id: 'C123', reasons: '年滿 70 歲以上', note: '今年 71 歲。' };
+  const n = S.noticeFor(rule(c123), c123);
+  assert.deepEqual(n.items, ['身分證明（身分證或戶口名簿）']);
+  assert.match(n.text, /^候選國民法官 C123 您好/);
+  assert.match(n.text, /【　年　月　日】[\s\S]*是否准許免除，由法官決定。/);
+  // 只差核對附件：不發
+  const c055 = { id: 'C055', reasons: '年滿 70 歲以上', note: '我今年 72 歲。（附身分證影本）' };
+  assert.equal(S.noticeFor(rule(c055), c055), null);
+  // 說明不夠具體：AI 只寫款號也要問對問題（第4款＝疾病）
+  const c046 = { id: 'C046', reasons: '有重大疾病、傷害或身心因素', note: '身體不好，常常不舒服。' };
+  const n46 = S.noticeFor(ai({ '對應事由': '第16條第4款', '類型': '得拒絕', 'AI建議': '資料不足' }, c046), c046);
+  assert.match(n46.items[0], /病名或傷勢/);
+  assert.equal(n46.items[n46.items.length - 1], '診斷證明書');
+  // 附錯證明：AI 判了、或 AI 還沒判都看得出來
+  const c161 = { id: 'C161', reasons: '有重大疾病、傷害或身心因素', note: '腰椎開刀（附戶口名簿影本）' };
+  assert.match(S.noticeFor(ai({ '對應事由': '第16條第4款', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否' }, c161), c161).items[0], /診斷證明書（您寫的附件是「戶口名簿影本」/);
+  assert.match(S.noticeFor(S.pendingResult(), c161).items[0], /診斷證明書/);
+  // 看起來不符合、編號有問題：不發
+  const c139 = { id: 'C139', reasons: '其他（請在說明欄寫明）', note: '我是夜市攤販。' };
+  assert.equal(S.noticeFor(ai({ '對應事由': '無', '類型': '無', 'AI建議': '看起來不符合' }, c139), c139), null);
+  assert.equal(S.noticeFor({ 'AI建議': '資料不足', '需人工確認': '是', '書記官待辦': '候選人編號格式異常，請核對名冊' }, c046), null);
+});
+
+test('finalize：AI 只寫款號（第16條第4款）也核對得出附件類型', () => {
+  const app = { reasons: '有重大疾病、傷害或身心因素', note: '腰椎開刀（附戶口名簿影本）' };
+  const out = S.finalize({ '對應事由': '第16條第4款', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否', src: 'ai' }, app);
+  assert.equal(out.docBad, true);
+});

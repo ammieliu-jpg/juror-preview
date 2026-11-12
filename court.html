@@ -73,6 +73,8 @@ tr.new td{animation:flash 2s ease-out}
 .src{font-size:11px;color:var(--mute)}
 label.doc{display:flex;gap:4px;align-items:center;margin-top:4px;font-size:12px;color:var(--warn);cursor:pointer;white-space:nowrap}
 label.doc.done{color:var(--ok)}
+.notice-btn{display:block;margin-top:6px;font-size:12px;padding:2px 8px}
+#noticeText{width:100%;box-sizing:border-box;font:inherit;font-size:14px;line-height:1.6;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
 #summary{white-space:pre-wrap;margin:0}
 .empty{color:var(--mute);padding:20px 0;text-align:center}
 .warnbox{border-color:var(--warn);color:var(--warn);font-size:14px}
@@ -134,12 +136,19 @@ label.doc.done{color:var(--ok)}
 <div class="kpis" id="kpis"></div>
 
 <section class="panel">
-  <h2>待審免除申請</h2>
+  <div class="bar" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">待審免除申請</h2><button id="noticeAll">產生全部補件通知</button></div>
   <div class="tbl"><table>
     <thead><tr><th>編號</th><th>勾選事由</th><th>民眾說明</th><th>對應事由</th><th>類型</th><th>初篩結果</th><th>人工確認</th><th>書記官待辦</th></tr></thead>
     <tbody id="rows"><tr><td colspan="8" class="empty">尚未載入資料</td></tr></tbody>
   </table></div>
   <p class="fine">先用規則判（本人寫明的年齡、在學、法定職業、曾任國民法官，不花 token），提到家人、需要判斷「重大」或說法模糊的才交給 AI。民眾寫的附件只是自述：「核對附件後送法官」要等你看過實際文件、打勾才算完成。只做初步整理，是否准許由法官決定。事由依國民法官法第 13～16 條、司法院常見問答 Q3606、Q3607。</p>
+</section>
+
+<section class="panel" id="noticePanel" hidden>
+  <h2>補件通知草稿</h2>
+  <p class="fine">依申請的事由用固定範本產生，不使用 AI。【】請填入期限、回覆方式與承辦資訊；書記官看過、修改後再寄出。草稿只在這台電腦產生。</p>
+  <textarea id="noticeText" rows="16" aria-label="補件通知草稿"></textarea>
+  <div class="bar" style="margin:8px 0 0"><button id="noticeCopy">複製</button><span class="status" id="noticeStatus"></span></div>
 </section>
 
 <section class="panel">

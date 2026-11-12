@@ -223,9 +223,10 @@
     var chk = ex.filter(function (r) { var c = view(r); return c && c['需人工確認'] === '是'; });
     var byRule = done.filter(function (r) { return cache[keyOf(r)].src === 'rule'; }).length, byAI = done.length - byRule;
     var docTodo = ex.filter(function (r) { return needsDocCheck(view(r)) && !docOk[keyOf(r)]; });
+    var notices = ex.filter(function (r) { return S.noticeFor(view(r), r); });
     $('kpis').innerHTML = [
       [rows.length, '已回覆人數'], [go.length, '回覆會到場'], [ex.length, '申請免除'], [und.length, '尚未決定'],
-      [byRule + '<small> / ' + byAI + '</small>', '規則判 / AI 判'], [chk.length, '需書記官確認', 'warn'], [docTodo.length, '待核對附件', 'warn']
+      [byRule + '<small> / ' + byAI + '</small>', '規則判 / AI 判'], [chk.length, '需書記官確認', 'warn'], [notices.length, '需補件'], [docTodo.length, '待核對附件', 'warn']
     ].map(function (k) { return '<div class="kpi ' + (k[2] || '') + '"><b>' + k[0] + '</b><span>' + k[1] + '</span></div>'; }).join('');
     if (!ex.length) { $('rows').innerHTML = '<tr><td colspan="8" class="empty">目前沒有免除申請</td></tr>'; return; }
     // 第一次載入不標示；之後新進來的申請閃一下
@@ -239,7 +240,8 @@
         '<td>' + (c ? esc(c['對應事由']) : '<span class="status">分類中…</span>') + '</td><td>' + (c ? esc(c['類型']) : '') + '</td>' +
         '<td>' + (c ? '<span class="who ' + src + '">' + SRC[src] + '</span> <span class="badge ' + cls + '">' + esc(adv) + '</span><div class="src">' + esc(c['理由']) + (c['依據'] ? '<br>' + esc(c['依據']) : '') + '</div>' : '') + '</td>' +
         '<td>' + (c ? (c['需人工確認'] === '是' ? '<span class="check">是</span>' : '否') : '') + '</td>' +
-        '<td' + (c && c.docBad ? ' class="check"' : '') + '>' + (c ? esc(c['書記官待辦']) : '') + docBox(k, c) + '</td></tr>';
+        '<td' + (c && c.docBad ? ' class="check"' : '') + '>' + (c ? esc(c['書記官待辦']) : '') + docBox(k, c) +
+        (S.noticeFor(c, r) ? '<button class="notice-btn" data-n="' + esc(k) + '">補件通知草稿</button>' : '') + '</td></tr>';
     }).join('');
   }
 
@@ -337,6 +339,31 @@
   $('refresh').onclick = function () { load(); };
   $('demo').onclick = function () { load(true); };
   $('sumBtn').onclick = summary;
+  /**
+   * 補件通知草稿：依事由用固定範本產生（lib/screening.js 的 noticeFor），不送 AI。
+   * 只發給「沒附證明、附錯證明、說明不夠具體」的申請；書記官改好再寄。
+   */
+  function showNotices(list) {
+    var texts = list.map(function (r) { var n = S.noticeFor(view(r), r); return n && n.text; }).filter(Boolean);
+    if (!texts.length) { $('status').textContent = '目前沒有需要補件的申請'; return; }
+    $('noticeText').value = texts.join('\n\n────────────────────\n\n');
+    $('noticeStatus').textContent = texts.length + ' 份草稿';
+    $('noticePanel').hidden = false;
+    $('noticePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('rows').addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.notice-btn');
+    if (!b) return;
+    var k = b.getAttribute('data-n');
+    showNotices(rows.filter(function (r) { return keyOf(r) === k; }));
+  });
+  $('noticeAll').onclick = function () { showNotices(rows.filter(isEx)); };
+  $('noticeCopy').onclick = function () {
+    var t = $('noticeText');
+    try {
+      navigator.clipboard.writeText(t.value).then(function () { $('noticeStatus').textContent = '已複製'; }, function () { t.select(); $('noticeStatus').textContent = '請按 Ctrl+C 複製'; });
+    } catch (err) { t.select(); $('noticeStatus').textContent = '請按 Ctrl+C 複製'; }
+  };
   $('rows').addEventListener('change', function (e) {
     var k = e.target.getAttribute && e.target.getAttribute('data-k');
     if (!k) return;
