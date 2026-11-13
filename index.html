@@ -474,7 +474,8 @@ async function story(){
     const how=await modal(`<h3>這次換你判</h3><div class="sub">國民法官 AI 預演室（非官方競賽原型）</div>
       <p style="font-size:14px">收到國民法官的通知了嗎？你可以先花 10 分鐘走一遍從選任到評議的過程，也可以直接看懂調查表怎麼填。遊戲裡的選擇都是練習，不會送出。真正回覆法院，請依通知書上的說明填官方調查表（例如用手機掃 QR code）；不會操作或掃不了，可以打電話問通知書上的承辦法院。</p>
       <div class="row"><button class="btn" data-close="play">先體驗（約 10 分鐘）</button><button class="btn alt" data-close="reply">看懂調查表、試填一次</button></div>`);
-    if(how==='reply'){ await surveyModal('看懂了，下一步：試填一次'); await replyFlow(); await say('旁白','想了解當國民法官會經歷什麼，可以繼續往下體驗。'); } }
+    if(how==='reply'){ await surveyModal('看懂了，下一步：試填一次'); await replyFlow(); await say('旁白','想了解當國民法官會經歷什麼，可以繼續往下體驗。'); }
+    else quizBefore=await quizModal(null); } // 玩之前先猜 5 題；結尾再答一次，比較前後
   // 1
   scene('home','你家客廳',1); hint('去一天有多少錢？');
   await say('旁白','某天下午，你在信箱裡發現一封法院寄來的信。');
@@ -505,6 +506,7 @@ async function story(){
   await say('旁白','宣誓完成。從現在起，你每天可以領 3,000 元日費，公司也必須給你公假，不能因此對你不利。（Q3637；Q3638；國民法官法第39條）');
   // 4
   scene('court','國民法官法庭',4); hint('可以看案件新聞嗎？');
+  await say('審判長','各位不需要有法律背景。這個制度看重的，正是法律知識以外的生活經驗；有任何聽不懂的地方，隨時可以請我說明。（Q3608）');
   await say('審判長','開始審理前，我先說明幾個原則。這些原則會陪你走完整個審判。');
   await modal(`<h3>審前說明：四個原則</h3><div class="sub">出自本案審前說明書</div><div class="cards">
     <div class="card"><span class="n">01</span><b>無罪推定</b>被告在判決確定前，都先推定為無罪。</div>
@@ -594,6 +596,7 @@ async function story(){
     <div class="stat"><div class="big"><s>25.7%</s>69.3%</div><p>覺得「沒有擔心」的比例，擔任前到擔任後</p></div>
     <div class="stat"><div class="big"><s>21.6%</s>72.7%</div><p>「非常願意」擔任的比例，一般民眾到擔任過的人</p></div></div>
     <p class="fine">最多人擔心的是聽不懂法律用語、不了解案情。這正是這個體驗想先幫你練習的事。</p><button class="btn" data-close="1">繼續</button>`);
+  if(quizBefore){ await quizModal(quizBefore); quizBefore=null; }
   const fin=await ask('審判長','體驗完之後，如果真的收到通知，你會願意去嗎？',['會，我會到場','我有狀況，想申請免除','我還在考慮']);
   // 想申請免除：先在站內看懂事由（不用登入），PartyRock 只是裡面的選項；其他人才直接推薦 PartyRock
   if(fin===1) await surveyModal('看懂了，繼續');
@@ -610,6 +613,37 @@ async function roadStep(ph,cap,fresh){ st.road={ph,from:fresh?ph:st.road.ph,at:p
 const ROAD_CAPS=['17:30｜雨天、下班尖峰','速限 50｜時速約 60–70','沒打方向燈，切到銀色小客車前方','再回到公車專用道','17:45｜時速 80 以上，再次切出','乙煞停；甲失控撞進騎樓'];
 async function replayRoad(){ for(let i=0;i<6;i++){ await roadStep(i,'重播｜'+ROAD_CAPS[i],i===0); await sleep(i===5?2600:1700); } }
 
+/* 前後小測驗：玩之前、玩之後答同樣 5 題，結尾顯示前後答對幾題。
+   題目取自團隊問卷裡最多人答錯的地方；答案與出處都是司法院常見問答。作答只留在這一頁，不會送出。 */
+const QUIZ=[
+  {q:'擔任國民法官，需要先有法律專業知識嗎？',o:['需要','不需要'],a:1,why:'不需要。制度看重的是法律以外的生活經驗，聽不懂可以請審判長說明。',src:'Q3608'},
+  {q:'被選為國民法官，一天的日費大約多少？',o:['沒有','500 元','1,500 元','3,000 元'],a:3,why:'每日 3,000 元；候選國民法官到庭 1,500 元，另有交通費。',src:'Q3637'},
+  {q:'被告會知道你的姓名和住址嗎？',o:['會','不會'],a:1,why:'不會。身分資料全程保密，法庭上只用號碼稱呼。',src:'Q3639'},
+  {q:'公司可以因此扣薪，或要求你請事假嗎？',o:['可以','不行'],a:1,why:'不行。雇主必須給公假，不得有不利處分。',src:'Q3638；國民法官法第39條'},
+  {q:'下列哪一個是可以向法院拒絕的法定理由？',o:['自認不懂法律','主管不准假','是在校學生'],a:2,why:'在校學生（或老師）可以拒絕；不懂法律、主管不准假都不是法定理由。',src:'Q3607'},
+];
+let quizBefore=null;
+// before＝null：玩之前，只收答案不公布（回傳答案陣列；跳過回傳 null）。before＝玩之前的答案：玩之後，作答完顯示前後對照。
+function quizModal(before){
+  const score=a=>a.filter((v,i)=>v===QUIZ[i].a).length;
+  return modal(`<h3>${before?'玩完了，同樣 5 題再答一次':'開始前，先猜 5 題'}</h3><div class="sub">${before?'看看和玩之前有什麼不同':'憑直覺回答就好，答案先不公布，玩完再對'}<span class="practice">不會送出</span></div>
+    ${QUIZ.map((x,i)=>`<span class="field">${i+1}. ${x.q}</span>${x.o.map((t,k)=>`<label><input type="radio" name="qz${i}" value="${k}"> ${t}</label>`).join('')}`).join('')}
+    <p class="warn" id="qzErr" hidden>還有題目沒有回答。</p>
+    <div class="row"><button class="btn" id="qzGo">${before?'看結果':'開始體驗'}</button>${before?'':'<button class="btn alt" data-close="skip">跳過</button>'}</div>`,(doc,close)=>{
+      doc.querySelector('#qzGo').onclick=()=>{
+        const ans=QUIZ.map((x,i)=>{ const r=doc.querySelector(`input[name=qz${i}]:checked`); return r?+r.value:-1; });
+        if(ans.includes(-1)){ doc.querySelector('#qzErr').hidden=false; return; }
+        if(!before){ close(ans); return; }
+        const mark=(a,i)=>a[i]===QUIZ[i].a?'○':'×';
+        doc.innerHTML=`<h3>你的前後對照</h3><div class="sub">同樣 5 題</div>
+          <div class="stats"><div class="stat"><div class="big" id="qzScore"><s>${score(before)} 題</s>→ ${score(ans)} 題<small>（共 ${QUIZ.length} 題）</small></div><p>答對題數，玩之前到玩之後</p></div></div>
+          ${QUIZ.map((x,i)=>`<p style="font-size:14px;margin:10px 0 0"><b>${i+1}. ${x.q}</b><br>玩之前 ${mark(before,i)}　玩之後 ${mark(ans,i)}<br>${x.why}<span class="cite">（${x.src}）</span></p>`).join('')}
+          <div class="row"><button class="btn" id="qzDone">繼續</button></div>`;
+        doc.scrollTop=0;
+        doc.querySelector('#qzDone').onclick=()=>close(ans);
+      };
+  }).then(v=>Array.isArray(v)?v:null);
+}
 // 簡化調查表：勾選後即時說明。選項和試填表單的 REASONS 對應（「其他」改成「以上都沒有」）。
 // next：按鈕文字（遊戲第 2 關是「寄回調查表」；從開頭或結尾進來是「下一步」）
 function surveyModal(next){
