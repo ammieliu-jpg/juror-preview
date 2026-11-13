@@ -127,6 +127,7 @@ for (const [name, device, touch] of PUBLIC_DEVICES) {
 test('民眾端（iPhone SE）：通知書的印章不蓋住標題', async () => {
   const p = await open('iPhone SE', 'index.html');
   await p.click('#doc [data-close="play"]');
+  await p.click('#doc [data-close="skip"]'); // 跳過開始前的小測驗
   for (let i = 0; i < 30 && !(await state(p)).seal; i++) { await nextLine(p); await p.waitForTimeout(50); }
   const overlap = await p.evaluate(() => {
     const a = document.querySelector('#doc .seal').getBoundingClientRect(), b = document.querySelector('#doc h3').getBoundingClientRect();
@@ -141,6 +142,7 @@ for (const phone of PHONES) {
   test(`民眾端（${phone}）：問答小幫手的回答從開頭顯示`, async () => {
     const p = await open(phone, 'index.html');
     await p.click('#doc [data-close="play"]');
+    await p.click('#doc [data-close="skip"]'); // 跳過開始前的小測驗
     await p.click('#phoneBtn');
     await p.fill('#phInput', '去一天有多少錢？');
     await p.press('#phInput', 'Enter');
@@ -158,17 +160,24 @@ for (const phone of PHONES) {
   });
 }
 
-for (const [name, device] of [['iPhone SE', 'iPhone SE'], ['筆電 1366×768', LAPTOP]]) test(`民眾端（${name}）：從頭玩到結尾，沒有任何錯誤`, async () => {
-  const p = await open(device, 'index.html');
+/** 小測驗的正確答案（每題第幾個選項，0 起算）。和 index.html 的 QUIZ 一致。 */
+const QUIZ_RIGHT = [1, 3, 1, 1, 2];
+const answerQuiz = async (p, picks) => { for (let i = 0; i < picks.length; i++) await p.check(`#doc input[name=qz${i}][value="${picks[i]}"]`); };
+
+/**
+ * 從目前的畫面一路玩到結尾。onQuiz：遇到小測驗時怎麼答（沒給就跳過；結尾的小測驗只有開頭作答過才會出現）。
+ * @returns {Promise<{done:boolean, stages:Set<string>}>}
+ */
+async function playToEnd(p, onQuiz) {
   const AVOID = /重播|重新填寫|不表態|再玩一次/; // 會繞回原處的選項
   const stages = new Set();
-  let done = false;
-  for (let i = 0; i < 1000 && !done; i++) {
+  for (let i = 0; i < 1000; i++) {
     const s = await state(p);
     stages.add(s.stage.slice(0, 9));
-    if (/謝謝你走完這次預演/.test(s.text) && s.choices.length) { done = true; break; }
+    if (/謝謝你走完這次預演/.test(s.text) && s.choices.length) return { done: true, stages };
     if (s.modal) {
       if (s.hold) { await p.locator('#hold').dispatchEvent('pointerdown'); await p.waitForTimeout(2600); continue; }
+      if (await p.locator('#doc #qzGo').count() && onQuiz) { await onQuiz(p); await p.waitForTimeout(40); continue; }
       const pick = s.reply ? '0' : s.close.find(v => v !== 'reply' && v !== '0'); // 試填表單按「取消」
       assert.ok(pick !== undefined, `文件視窗沒有可以關掉的按鈕（${s.stage}）`);
       await p.click(`#doc [data-close="${pick}"]`);
@@ -180,8 +189,39 @@ for (const [name, device] of [['iPhone SE', 'iPhone SE'], ['筆電 1366×768', L
     }
     await p.waitForTimeout(40);
   }
-  assert.ok(done, '沒有走到結尾');
-  assert.ok(stages.has('STAGE 8/8'), '要經過第 8 關');
+  return { done: false, stages };
+}
+
+for (const [name, device] of [['iPhone SE', 'iPhone SE'], ['筆電 1366×768', LAPTOP]]) test(`民眾端（${name}）：從頭玩到結尾，沒有任何錯誤`, async () => {
+  const p = await open(device, 'index.html');
+  const r = await playToEnd(p); // 小測驗按「跳過」
+  assert.ok(r.done, '沒有走到結尾');
+  assert.ok(r.stages.has('STAGE 8/8'), '要經過第 8 關');
+  assert.deepEqual(p.errors, []);
+  await p.context().close();
+});
+
+test('民眾端（iPhone SE）：前後小測驗，玩之前全錯、玩之後全對，結尾顯示 0 → 5', async () => {
+  const p = await open('iPhone SE', 'index.html');
+  await p.click('#doc [data-close="play"]');
+  assert.match(await p.textContent('#doc h3'), /先猜 5 題/);
+  assert.deepEqual(await docLayout(p), [], '小測驗版面');
+  await p.click('#qzGo');
+  assert.ok(await p.isVisible('#qzErr'), '沒答完不能送出');
+  let rounds = 0, result = '';
+  const r = await playToEnd(p, async q => {
+    rounds++;
+    await answerQuiz(q, rounds === 1 ? QUIZ_RIGHT.map(v => (v === 0 ? 1 : 0)) : QUIZ_RIGHT);
+    await q.click('#qzGo');
+    if (rounds === 2) { result = await q.textContent('#doc'); await q.click('#qzDone'); }
+  });
+  assert.ok(r.done, '沒有走到結尾');
+  assert.equal(rounds, 2, '開頭、結尾各答一次');
+  assert.match(result, /0 題→ 5 題（共 5 題）/, '答對題數 0 → 5');
+  for (const src of ['Q3608', 'Q3637', 'Q3639', 'Q3638', 'Q3607']) assert.ok(result.includes(src), '每題附出處 ' + src);
+  // 遊戲裡要真的講到每一題的答案（不然前後測就只是公布答案）
+  const html = await p.content();
+  for (const t of ['不需要有法律背景', '每天可以領 3,000 元日費', '全程保密', '公司也必須給你公假', '具有老師或學生身分']) assert.ok(html.includes(t), '遊戲內容要有：' + t);
   assert.deepEqual(p.errors, []);
   await p.context().close();
 });
