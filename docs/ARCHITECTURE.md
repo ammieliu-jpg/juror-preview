@@ -3,8 +3,8 @@
 這份文件說明「這次換你判：AI 國民法官預演室」由哪些部分組成、資料怎麼流動、每個部分在哪裡執行。
 圖用 Mermaid 繪製，在 GitHub 上會直接顯示成圖。
 
-> 定位：**官方調查表不改，我們幫民眾看懂它、幫書記官審完它。**
-> 民眾端讓人在回覆前先看懂流程與調查表（第 13、14、16 條逐款白話說明）；法院端用「規則＋AI」初篩免除申請的自由文字，最後由法官決定。
+> 定位：**官方調查表不改，我們幫民眾看懂它、幫法院先整理好它。**
+> 民眾端讓人在回覆前先看懂流程與調查表（第 13、14、16 條逐款白話說明）；法院端用「規則＋AI」初篩免除申請的自由文字，最後由法院裁定。
 
 ---
 
@@ -36,7 +36,7 @@ flowchart LR
     LS["Looker Studio"]
   end
 
-  subgraph 書記官的電腦
+  subgraph 承辦人員的電腦
     C["court.html<br/>法院端儀表板"]
   end
 
@@ -64,7 +64,7 @@ flowchart LR
 | 示範表單 | Google 表單 | Google | 是（只能用虛構資料） |
 | 自動分類 | `apps-script/Code.gs`（= `apps-script/main.gs` + `lib/screening.js`） | Google Apps Script | 是 |
 | AI 模型 | Gemini API（原型）／TAIDE（正式版） | Google／法院自建 | 是（只送規則判不了的那幾筆） |
-| 法院端儀表板 | `court.html` + `court.js` + `lib/screening.js` | 書記官的瀏覽器 | 是 |
+| 法院端儀表板 | `court.html` + `court.js` + `lib/screening.js` | 承辦人員的瀏覽器 | 是 |
 | 統計圖表 | Looker Studio | Google | 統計數字為主 |
 | AI 工具箱 | PartyRock（模組 2、3、5、6） | AWS PartyRock | 民眾自己輸入 |
 
@@ -82,7 +82,7 @@ sequenceDiagram
   participant AS as Apps Script
   participant AI as Gemini
   participant C as court.html
-  actor 書記官
+  actor 承辦人員
 
   民眾->>G: 玩完預演，選「試填一次（示範）」
   G->>G: 填編號、回覆、事由；說明欄依勾選事由顯示填寫範例
@@ -103,11 +103,11 @@ sequenceDiagram
   AS->>AS: finalize（欄位一致、附件類型核對）
   AS->>SH: 取得鎖 → sanitizeCell 後寫入 9 個 AI 欄位（含規則版本）
   AS->>SH: rebuildDashboard → 回覆資料、到場預測
-  書記官->>C: 打開儀表板（每 20 秒自動更新）
+  承辦人員->>C: 打開儀表板（每 20 秒自動更新）
   C->>AS: GET …/exec?token=存取碼
   AS-->>C: JSON（已分類的結果）
-  C->>書記官: KPI、待審清單、需人工確認、書記官待辦
-  書記官->>書記官: 補件、電話確認，送法官決定
+  C->>承辦人員: KPI、待審清單、需人工確認、承辦待辦
+  承辦人員->>承辦人員: 補件、電話確認，送法院裁定
 ```
 
 ---
@@ -135,17 +135,17 @@ flowchart TD
   AI["AI：buildPrompt → Gemini → checkAI<br/>類型／AI建議不在白名單 → 保守值＋格式異常"]
 
   R1 & R2 & R3 --> P{"說明有寫附件？"}
-  P -->|有| OK["核對附件後送法官<br/>（書記官看過實際文件後打勾）"]
+  P -->|有| OK["核對附件後送法院<br/>（承辦人員看過實際文件後打勾）"]
   P -->|沒有| NEED["需人工確認：請補證明"]
   AI --> H{"AI 說可能符合＋不需確認，<br/>而且有附件、沒有可疑文字？"}
   H -->|是| OK
   H -->|否| NEED
 
-  OK & NEED & R0 & R4 --> Z["finalize：附件類型和事由對不上 → 需人工確認<br/>結果只是初步整理，是否准許由法官決定"]
+  OK & NEED & R0 & R4 --> Z["finalize：附件類型和事由對不上 → 需人工確認<br/>結果只是初步整理，是否准許由法院裁定"]
 ```
 
 規則層採白名單：只有本人寫法才判，其他一律交給 AI＋人工。每條規則都有測試案例（`tests/fixtures/exemptions.json`），`npm run eval` 會算出覆蓋率與正確率。
-附件只是民眾在說明裡寫的字，所以不論哪一層，最好的結果都是「核對附件後送法官」，不會出現「可直接送法官」。
+附件只是民眾在說明裡寫的字，所以不論哪一層，最好的結果都是「核對附件後送法院」，不會出現「可直接送法官」。
 
 ---
 

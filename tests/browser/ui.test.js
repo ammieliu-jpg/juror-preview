@@ -6,7 +6,7 @@
 //   npm i --no-save playwright@1.63.0 && npx playwright install chromium
 //
 // 民眾端：大多數人用手機掃 QR code，但也有人會在電腦上輸入網址，所以手機和筆電尺寸都檢查。
-// 法院端是書記官在電腦上用的工作頁：用電腦尺寸檢查，手機上只確認不出錯。
+// 法院端是承辦人員在電腦上用的工作頁：用電腦尺寸檢查，手機上只確認不出錯。
 // 外部網路（字型、語意模型）一律擋掉：測試不靠網路，問答會走關鍵字比對。
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -286,7 +286,7 @@ for (const file of ['import-utf8.csv', 'import-big5.csv']) {
     assert.match(await p.textContent('#status'), /4 列.*不會上傳/);
     const rows = await p.$$eval('#rows tr', trs => trs.map(t => t.innerText.replace(/\s+/g, ' ')));
     assert.equal(rows.length, 2, '兩筆申請免除（標題是「回覆意願」、內容是「申請拒絕被選任」）');
-    assert.ok(rows.some(t => /C201.*年滿七十歲以上.*規則判.*核對身分證明後送法官/.test(t)), rows.join('\n'));
+    assert.ok(rows.some(t => /C201.*年滿七十歲以上.*規則判.*核對身分證明後送法院/.test(t)), rows.join('\n'));
     assert.ok(rows.some(t => /C203.*待 AI.*不送 AI/.test(t)), rows.join('\n'));
     assert.deepEqual(outside.filter(u => /generativelanguage|script\.google|docs\.google/.test(u)), [], '匯入的資料不能送到外部');
     assert.deepEqual(p.errors, []);

