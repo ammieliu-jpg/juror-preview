@@ -683,7 +683,7 @@ function oathModal(){
   });
 }
 /* 試填回覆（示範）：和遊戲分開，要填編號並再次確認才會開啟示範表單。
-   定位：「官方調查表不改，我們幫民眾看懂它、幫書記官審完它。」
+   定位：「官方調查表不改，我們幫民眾看懂它、幫法院先整理好它。」
    這裡的 Google 表單是競賽示範用的替身，代表法院端收到資料後的流程；真正的回覆走官方線上調查表。 */
 const FORM={url:'https://docs.google.com/forms/d/e/1FAIpQLSe3PPB_zPOpHZhpuS3HWQG38fQp3KDoHWHSf30XxvKTyTq3GQ/viewform',id:'entry.1612295714',reply:'entry.1258938889',reasons:'entry.1051708947',note:'entry.964700410'}; // 填入 Google 表單「預先填入連結」的代號
 // 文字要和 Google 表單第 3 題的核取方塊選項完全一樣
@@ -726,7 +726,7 @@ function realReply(){
         s2.innerHTML=`<h3>確認送出</h3><div class="sub">送出後，示範的法院端儀表板會收到以下內容</div>
           <dl><dt>候選人編號</dt><dd>${esc(id)}</dd><dt>回覆</dt><dd><b>${label}</b></dd>${rs.length?`<dt>事由</dt><dd>${esc(rs.join('、'))}</dd>`:''}${note?`<dt>說明</dt><dd>${esc(note)}</dd>`:''}</dl>
           ${note&&link?`<p class="warn">為了保護你的健康等個人資料，說明不會放進網址。按「確定送出」時會自動複製說明，請在表單最後一題「具體情況說明」貼上。</p><div class="row"><button class="btn alt" type="button" id="rpCopy">先複製說明</button></div>`:''}
-          <div class="result">示範的法院端儀表板會即時統計回覆、預測到場人數；免除申請會先由 AI 整理給書記官，再由法官決定。</div>
+          <div class="result">示範的法院端儀表板會即時統計回覆、預測到場人數；免除申請會先由 AI 整理給承辦人員，再由法院裁定。</div>
           <div class="row">${link?`<a class="btn" id="rpSend" href="${esc(link)}" target="_blank" rel="noopener">確定送出（開啟示範表單）</a>`:`<button class="btn" id="rpSend">確定送出（原型：表單尚未連結）</button>`}<button class="btn alt" id="rpBack">返回修改</button></div>`;
         $d('#rpBack').onclick=()=>{ s2.hidden=true; $d('#rpS1').hidden=false; $d('#rpErr').hidden=true; };
         const copyNote=()=>{ try{ return navigator.clipboard.writeText(note).then(()=>true,()=>false) }catch(e){ return Promise.resolve(false) } };

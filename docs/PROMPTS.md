@@ -7,9 +7,9 @@ PartyRock 沒有 API，提示詞只能手動貼上。`prompts/` 收錄目前的�
 | 1 | 常見問答小幫手 | 民眾 | 遊戲右下角手機（瀏覽器內語意搜尋）；PartyRock 版給評審看 AI 模組 | `index.html` 的 `KB`＝`prompts/PartyRock問答提示詞.txt` |
 | 2 | 個人化導覽（到庭準備清單） | 民眾 | PartyRock | `prompts/模組2_個人化導覽設定.txt` |
 | 3 | 免除資格初篩＋申請說明草稿 | 民眾 | PartyRock | `prompts/模組3_免除初篩設定.txt` |
-| 4 | 法院儀表板（到場預測） | 書記官 | Google 試算表＋Looker Studio | 不用 AI；資料格式見 [DATA_SCHEMA.md](DATA_SCHEMA.md) |
+| 4 | 法院儀表板（到場預測） | 承辦人員 | Google 試算表＋Looker Studio | 不用 AI；資料格式見 [DATA_SCHEMA.md](DATA_SCHEMA.md) |
 | 5 | 模擬評議 | 民眾 | PartyRock（遊戲第 7 關的連結） | `prompts/模組5_AI模擬評議提示詞.txt`；`index.html` 的 `DELIB` |
-| 6 | 免除申請自動分類 | 書記官 | Apps Script（自動）、court.html、PartyRock（展示） | `lib/screening.js` 的 `RULES_PROMPT`；PartyRock 版 `prompts/模組6_免除申請自動分類設定.txt` |
+| 6 | 免除申請自動分類 | 承辦人員 | Apps Script（自動）、court.html、PartyRock（展示） | `lib/screening.js` 的 `RULES_PROMPT`；PartyRock 版 `prompts/模組6_免除申請自動分類設定.txt` |
 
 ## 事由清單的單一來源
 
@@ -31,8 +31,8 @@ PartyRock 沒有 API，提示詞只能手動貼上。`prompts/` 收錄目前的�
 
 ## 2026-11-04 修改紀錄（第二輪）
 
-- `RULES_PROMPT` 輸出範例的「可直接送法官」改成「核對附件後送法官」（附件只是民眾自述）
-- 書記官摘要改由程式產生（`Screening.summarize`），Apps Script 與 court.html 都不再呼叫 AI；PartyRock 模組 6 的摘要元件仍用 AI，用語同步改成「核對附件後可送法官」
+- `RULES_PROMPT` 輸出範例的「可直接送法官」改成「核對附件後送法院」（附件只是民眾自述）
+- 承辦摘要改由程式產生（`Screening.summarize`），Apps Script 與 court.html 都不再呼叫 AI；PartyRock 模組 6 的摘要元件仍用 AI，用語同步改成「核對附件後可送法院」
 - `RULES_VERSION` 改為 `2026-11-04.2`
 
 ## 2026-11-04 修改紀錄

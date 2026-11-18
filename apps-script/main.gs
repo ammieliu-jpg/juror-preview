@@ -42,21 +42,21 @@ const FIELDS = {
   note:    { re: /說明/,            fallback: 5 },
 };
 /** AI 寫入的欄位（不存在就自動加在最右邊）。只能在最後面新增，不要改順序。 */
-const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '書記官待辦', 'AI 處理時間', '判斷來源', '規則版本'];
+const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '承辦待辦', 'AI 處理時間', '判斷來源', '規則版本'];
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 /** Apps Script 單次執行上限 6 分鐘；留 1 分鐘緩衝，超過就先停，請使用者再按一次。 */
 const TIME_BUDGET_MS = 5 * 60 * 1000;
 /** 免費額度每分鐘有次數上限，每筆 AI 呼叫之間的間隔。 */
 const AI_GAP_MS = 4500;
 /** 模組 4 的工作表名稱與假設值（和《模組4_法院儀表板模擬資料.xlsx》一致）。 */
-const DASH = { roster: '通知名冊', replies: '回覆資料', forecast: '到場預測', summary: '書記官摘要', showRate: 0.9, baseRate: 0.489, needed: 57 };
+const DASH = { roster: '通知名冊', replies: '回覆資料', forecast: '到場預測', summary: '承辦摘要', showRate: 0.9, baseRate: 0.489, needed: 57 };
 
 /* ---------- 觸發與選單 ---------- */
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('🤖 AI 免除分類')
     .addItem('分類所有尚未處理的申請', 'classifyPending')
-    .addItem('產生書記官摘要', 'writeSummary')
+    .addItem('產生承辦摘要', 'writeSummary')
     .addItem('重建儀表板資料（回覆資料／到場預測）', 'rebuildDashboard')
     .addSeparator()
     .addItem('測試 API 金鑰', 'testKey')
@@ -136,7 +136,7 @@ function classifyRow_(sheet, row, ctx) {
   let out = Screening.ruleClassify(app);
   let usedAI = false;
   if (!out && problem) {
-    out = { '對應事由': '—', '類型': '—', 'AI建議': '資料不足', '需人工確認': '是', '理由': '編號未通過檢查，未送 AI', '書記官待辦': problem, src: 'rule' };
+    out = { '對應事由': '—', '類型': '—', 'AI建議': '資料不足', '需人工確認': '是', '理由': '編號未通過檢查，未送 AI', '承辦待辦': problem, src: 'rule' };
   } else if (!out) {
     usedAI = true;
     try {
@@ -146,7 +146,7 @@ function classifyRow_(sheet, row, ctx) {
     }
   }
   out = Screening.finalize(out, app);
-  if (problem) out = Object.assign({}, out, { '需人工確認': '是', '書記官待辦': problem });
+  if (problem) out = Object.assign({}, out, { '需人工確認': '是', '承辦待辦': problem });
   // AI 失敗（pending）不寫處理時間，下次「分類所有尚未處理的申請」會再試
   const source = { rule: '規則', ai: 'AI', pending: '待人工' }[out.src] || '';
   withLock_(() => writeAI_(sheet, row, cols, out, out.src === 'pending' ? '' : stamp, source));
@@ -162,7 +162,7 @@ function readApp_(sheet, row, cols) {
 function writeAI_(sheet, row, cols, out, stamp, source) {
   const vals = {
     'AI 對應事由': out['對應事由'], 'AI 類型': out['類型'], 'AI 建議': out['AI建議'], '需人工確認': out['需人工確認'],
-    'AI 理由': out['理由'], '書記官待辦': out['書記官待辦'], 'AI 處理時間': stamp, '判斷來源': source,
+    'AI 理由': out['理由'], '承辦待辦': out['承辦待辦'], 'AI 處理時間': stamp, '判斷來源': source,
     '規則版本': Screening.RULES_VERSION,
   };
   AI_COLS.forEach(k => sheet.getRange(row, cols.ai[k]).setValue(Screening.sanitizeCell(vals[k] || '')));
@@ -253,10 +253,10 @@ function rebuildDashboard() {
   ]);
 }
 
-/* ---------- 書記官摘要（純程式，不用 AI） ---------- */
+/* ---------- 承辦摘要（純程式，不用 AI） ---------- */
 
 /**
- * 選單「產生書記官摘要」：由 Screening.summarize 統計筆數與編號。
+ * 選單「產生承辦摘要」：由 Screening.summarize 統計筆數與編號。
  * 以前請 Gemini 寫，會把所有申請（包含規則已經判掉的）送出去，還可能算錯筆數；現在不呼叫任何 API。
  * 同一位候選人送出多次，以最後一次為準（和 rebuildDashboard 一致）。
  */
@@ -274,7 +274,7 @@ function writeSummary() {
       id: String(r[cols.id - 1]),
       c: r[cols.ai['AI 處理時間'] - 1] === ''
         ? Screening.pendingResult('尚未分類，請按「分類所有尚未處理的申請」')
-        : { 'AI建議': r[cols.ai['AI 建議'] - 1], '需人工確認': r[cols.ai['需人工確認'] - 1], '書記官待辦': r[cols.ai['書記官待辦'] - 1] },
+        : { 'AI建議': r[cols.ai['AI 建議'] - 1], '需人工確認': r[cols.ai['需人工確認'] - 1], '承辦待辦': r[cols.ai['承辦待辦'] - 1] },
     }));
   if (!items.length) { SpreadsheetApp.getUi().alert('目前沒有免除申請。'); return; }
   const text = Screening.summarize(items);
@@ -341,6 +341,9 @@ function responseSheet_() {
 /** 找出表單題目與 AI 欄位的位置（1 起算）；AI 欄位不存在就加在最右邊。 */
 function cols_(sheet) {
   let head = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  // 舊版試算表的欄名是「書記官待辦」：改名沿用，不另開新欄
+  const legacy = head.indexOf('書記官待辦');
+  if (legacy >= 0 && !head.includes('承辦待辦')) { sheet.getRange(1, legacy + 1).setValue('承辦待辦'); head[legacy] = '承辦待辦'; }
   const missing = AI_COLS.filter(k => !head.includes(k));
   if (missing.length) {
     sheet.getRange(1, head.length + 1, 1, missing.length).setValues([missing]).setFontWeight('bold').setBackground('#d9e8fb');

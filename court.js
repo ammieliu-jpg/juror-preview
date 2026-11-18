@@ -2,7 +2,7 @@
  * court.js：法院端儀表板（court.html）的程式
  * ============================================
  *
- * 書記官每天打開的工作頁：讀取民眾的回覆，統計出席，並列出免除申請的初篩結果。
+ * 承辦人員每天打開的工作頁：讀取民眾的回覆，統計出席，並列出免除申請的初篩結果。
  * 初篩邏輯在 lib/screening.js（和 Apps Script 共用），這裡只負責讀資料、快取和畫面。
  *
  * 資料來源：
@@ -93,7 +93,7 @@
   var rows = [], seen = null, timer = null, running = false, mode = 'remote';
   // Apps Script 回報的規則版本。和這一頁的不同，代表有人改了 lib/screening.js 卻還沒重新部署 Apps Script（或反過來）
   var remoteVersion = null;
-  // 書記官看過實際附件後打勾；沒打勾的「核對附件後送法官」不算完成
+  // 承辦人員看過實際附件後打勾；沒打勾的「核對附件後送法院」不算完成
   var docOk = local.get('docOk', {});
 
   function fillForm() {
@@ -121,13 +121,13 @@
     if (!ai || !ai['AI 處理時間']) return null;
     return {
       '對應事由': ai['AI 對應事由'] || '無', '類型': ai['AI 類型'] || '無', 'AI建議': ai['AI 建議'] || '',
-      '需人工確認': ai['需人工確認'] || '是', '理由': ai['AI 理由'] || '', '書記官待辦': ai['書記官待辦'] || '',
+      '需人工確認': ai['需人工確認'] || '是', '理由': ai['AI 理由'] || '', '承辦待辦': ai['承辦待辦'] || ai['書記官待辦'] || '',
       src: ai['判斷來源'] === '規則' ? 'rule' : 'ai'
     };
   }
   /** 畫面用的最終結果（共用 finalize：欄位一致＋附件核對）。 */
   function view(r) { return S.finalize(cache[keyOf(r)], r); }
-  /** 不需要追問、只差書記官核對附件的申請。 */
+  /** 不需要追問、只差承辦人員核對附件的申請。 */
   var needsDocCheck = function (c) { return c && c.src !== 'pending' && c['需人工確認'] === '否'; };
 
   /**
@@ -226,7 +226,7 @@
     var notices = ex.filter(function (r) { return S.noticeFor(view(r), r); });
     $('kpis').innerHTML = [
       [rows.length, '已回覆人數'], [go.length, '回覆會到場'], [ex.length, '申請免除'], [und.length, '尚未決定'],
-      [byRule + '<small> / ' + byAI + '</small>', '規則判 / AI 判'], [chk.length, '需書記官確認', 'warn'], [notices.length, '需補件'], [docTodo.length, '待核對附件', 'warn']
+      [byRule + '<small> / ' + byAI + '</small>', '規則判 / AI 判'], [chk.length, '需承辦確認', 'warn'], [notices.length, '需補件'], [docTodo.length, '待核對附件', 'warn']
     ].map(function (k) { return '<div class="kpi ' + (k[2] || '') + '"><b>' + k[0] + '</b><span>' + k[1] + '</span></div>'; }).join('');
     if (!ex.length) { $('rows').innerHTML = '<tr><td colspan="8" class="empty">目前沒有免除申請</td></tr>'; return; }
     // 第一次載入不標示；之後新進來的申請閃一下
@@ -240,15 +240,15 @@
         '<td>' + (c ? esc(c['對應事由']) : '<span class="status">分類中…</span>') + '</td><td>' + (c ? esc(c['類型']) : '') + '</td>' +
         '<td>' + (c ? '<span class="who ' + src + '">' + SRC[src] + '</span> <span class="badge ' + cls + '">' + esc(adv) + '</span><div class="src">' + esc(c['理由']) + (c['依據'] ? '<br>' + esc(c['依據']) : '') + '</div>' : '') + '</td>' +
         '<td>' + (c ? (c['需人工確認'] === '是' ? '<span class="check">是</span>' : '否') : '') + '</td>' +
-        '<td' + (c && c.docBad ? ' class="check"' : '') + '>' + (c ? esc(c['書記官待辦']) : '') + docBox(k, c) +
+        '<td' + (c && c.docBad ? ' class="check"' : '') + '>' + (c ? esc(c['承辦待辦']) : '') + docBox(k, c) +
         (S.noticeFor(c, r) ? '<button class="notice-btn" data-n="' + esc(k) + '">補件通知草稿</button>' : '') + '</td></tr>';
     }).join('');
   }
 
-  /** 「核對附件後送法官」的勾選框：書記官看過實際文件才勾。系統只能比對民眾寫的附件名稱。 */
+  /** 「核對附件後送法院」的勾選框：承辦人員看過實際文件才勾。系統只能比對民眾寫的附件名稱。 */
   function docBox(k, c) {
     if (!needsDocCheck(c)) return '';
-    return docOk[k] ? '<label class="doc done"><input type="checkbox" data-k="' + esc(k) + '" checked> 附件已核對，可送法官</label>'
+    return docOk[k] ? '<label class="doc done"><input type="checkbox" data-k="' + esc(k) + '" checked> 附件已核對，可送法院</label>'
       : '<label class="doc"><input type="checkbox" data-k="' + esc(k) + '"> 我已看過附件</label>';
   }
 
@@ -291,7 +291,7 @@
     } finally { running = false; }
   }
 
-  /* ---------- 書記官摘要 ---------- */
+  /* ---------- 承辦摘要 ---------- */
 
   /** 由程式統計（lib/screening.js 的 summarize），不用 AI，也不會把申請內容送出去。 */
   function summary() {
@@ -341,7 +341,7 @@
   $('sumBtn').onclick = summary;
   /**
    * 補件通知草稿：依事由用固定範本產生（lib/screening.js 的 noticeFor），不送 AI。
-   * 只發給「沒附證明、附錯證明、說明不夠具體」的申請；書記官改好再寄。
+   * 只發給「沒附證明、附錯證明、說明不夠具體」的申請；承辦人員改好再寄。
    */
   function showNotices(list) {
     var texts = list.map(function (r) { var n = S.noticeFor(view(r), r); return n && n.text; }).filter(Boolean);
