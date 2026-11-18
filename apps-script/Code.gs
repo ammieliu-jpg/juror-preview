@@ -789,7 +789,7 @@ var Screening = (function () {
     return [
       '候選國民法官 ' + String(app.id || '') + ' 您好：',
       '',
-      '本院已收到您的回覆。您申請免除擔任國民法官' + (app.reasons ? '（勾選：' + String(app.reasons) + '）' : '') + '，為了讓法官審查，請補充下列資料：',
+      '本院已收到您的回覆。您申請免除擔任國民法官' + (app.reasons ? '（勾選：' + String(app.reasons) + '）' : '') + '，為了讓法院審查，請補充下列資料：',
       '',
       items.map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n'),
       '',
