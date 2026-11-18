@@ -726,7 +726,7 @@ function realReply(){
         s2.innerHTML=`<h3>確認送出</h3><div class="sub">送出後，示範的法院端儀表板會收到以下內容</div>
           <dl><dt>候選人編號</dt><dd>${esc(id)}</dd><dt>回覆</dt><dd><b>${label}</b></dd>${rs.length?`<dt>事由</dt><dd>${esc(rs.join('、'))}</dd>`:''}${note?`<dt>說明</dt><dd>${esc(note)}</dd>`:''}</dl>
           ${note&&link?`<p class="warn">為了保護你的健康等個人資料，說明不會放進網址。按「確定送出」時會自動複製說明，請在表單最後一題「具體情況說明」貼上。</p><div class="row"><button class="btn alt" type="button" id="rpCopy">先複製說明</button></div>`:''}
-          <div class="result">示範的法院端儀表板會即時統計回覆、預測到場人數；免除申請會先由 AI 整理給承辦人員，再由法院裁定。</div>
+          <div class="result">示範的法院端儀表板會即時統計回覆、預測到場人數；免除申請會先由 AI 整理給承辦人員，再由法院審核決定。</div>
           <div class="row">${link?`<a class="btn" id="rpSend" href="${esc(link)}" target="_blank" rel="noopener">確定送出（開啟示範表單）</a>`:`<button class="btn" id="rpSend">確定送出（原型：表單尚未連結）</button>`}<button class="btn alt" id="rpBack">返回修改</button></div>`;
         $d('#rpBack').onclick=()=>{ s2.hidden=true; $d('#rpS1').hidden=false; $d('#rpErr').hidden=true; };
         const copyNote=()=>{ try{ return navigator.clipboard.writeText(note).then(()=>true,()=>false) }catch(e){ return Promise.resolve(false) } };
