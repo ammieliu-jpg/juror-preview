@@ -258,7 +258,7 @@ test('法院端（電腦）：示範資料、附件勾選、摘要', async () =>
   assert.ok(!/C055|C107/.test(all), '只差核對附件的不發補件通知');
 
   await p.click('#sumBtn');
-  assert.match(await p.textContent('#summary'), /^共 17 筆免除申請/);
+  assert.match(await p.textContent('#summary'), /^共 17 筆表明不能或拒絕擔任/);
   assert.doesNotMatch(await p.textContent('#rows'), /可直接送法官/);
   assert.deepEqual(p.errors, []);
   await p.context().close();

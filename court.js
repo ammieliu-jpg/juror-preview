@@ -225,10 +225,10 @@
     var docTodo = ex.filter(function (r) { return needsDocCheck(view(r)) && !docOk[keyOf(r)]; });
     var notices = ex.filter(function (r) { return S.noticeFor(view(r), r); });
     $('kpis').innerHTML = [
-      [rows.length, '已回覆人數'], [go.length, '回覆會到場'], [ex.length, '申請免除'], [und.length, '尚未決定'],
+      [rows.length, '已回覆人數'], [go.length, '回覆會到場'], [ex.length, '表明不能或拒絕擔任'], [und.length, '尚未決定'],
       [byRule + '<small> / ' + byAI + '</small>', '規則判 / AI 判'], [chk.length, '需承辦確認', 'warn'], [notices.length, '需補件'], [docTodo.length, '待核對附件', 'warn']
     ].map(function (k) { return '<div class="kpi ' + (k[2] || '') + '"><b>' + k[0] + '</b><span>' + k[1] + '</span></div>'; }).join('');
-    if (!ex.length) { $('rows').innerHTML = '<tr><td colspan="8" class="empty">目前沒有免除申請</td></tr>'; return; }
+    if (!ex.length) { $('rows').innerHTML = '<tr><td colspan="8" class="empty">目前沒有表明不能或拒絕擔任的回覆</td></tr>'; return; }
     // 第一次載入不標示；之後新進來的申請閃一下
     var prev = seen; seen = new Set(ex.map(keyOf));
     var SRC = { rule: '規則判', ai: 'AI 判', pending: '待 AI' };
@@ -296,7 +296,7 @@
   /** 由程式統計（lib/screening.js 的 summarize），不用 AI，也不會把申請內容送出去。 */
   function summary() {
     var ex = rows.filter(isEx);
-    if (!ex.length) { $('summary').textContent = '目前沒有免除申請。'; return; }
+    if (!ex.length) { $('summary').textContent = '目前沒有表明不能或拒絕擔任的回覆。'; return; }
     $('summary').textContent = S.summarize(ex.map(function (r) {
       var k = keyOf(r);
       return { id: r.id, c: view(r) || S.pendingResult('分類中，請稍後'), checked: !!docOk[k] };

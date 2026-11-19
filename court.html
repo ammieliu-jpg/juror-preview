@@ -10,7 +10,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://docs.google.com https://script.google.com https://*.googleusercontent.com https://generativelanguage.googleapis.com; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>法院端儀表板</title>
-<meta name="description" content="國民法官選任回覆的法院端儀表板：讀取表單回覆，由 AI 初步分類免除申請。非官方競賽原型。">
+<meta name="description" content="國民法官選任回覆的法院端儀表板：讀取表單回覆，初步整理表明不能或拒絕擔任的回覆。非官方競賽原型。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap">
 <style>
@@ -86,7 +86,7 @@ label.doc.done{color:var(--ok)}
 <body>
 <div class="wrap">
 <header>
-  <h1>法院端儀表板<small>國民法官選任回覆・免除申請初篩（規則＋AI）</small></h1>
+  <h1>法院端儀表板<small>國民法官選任回覆・除名審核初篩（規則＋AI）</small></h1>
   <span class="tag">模擬資料・非官方競賽原型</span>
 </header>
 
@@ -136,12 +136,12 @@ label.doc.done{color:var(--ok)}
 <div class="kpis" id="kpis"></div>
 
 <section class="panel">
-  <div class="bar" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">待審免除申請</h2><button id="noticeAll">產生全部補件通知</button></div>
+  <div class="bar" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">待審：表明不能或拒絕擔任</h2><button id="noticeAll">產生全部補件通知</button></div>
   <div class="tbl"><table>
     <thead><tr><th>編號</th><th>勾選事由</th><th>民眾說明</th><th>對應事由</th><th>類型</th><th>初篩結果</th><th>人工確認</th><th>承辦待辦</th></tr></thead>
     <tbody id="rows"><tr><td colspan="8" class="empty">尚未載入資料</td></tr></tbody>
   </table></div>
-  <p class="fine">先用規則判（本人寫明的年齡、在學、法定職業、曾任國民法官，不花 token），提到家人、需要判斷「重大」或說法模糊的才交給 AI。民眾寫的附件只是自述：「核對附件後送法院」要等你看過實際文件、打勾才算完成。只做初步整理，是否准許由法院裁定。事由依國民法官法第 13～16 條、司法院常見問答 Q3606、Q3607。</p>
+  <p class="fine">先用規則判（本人寫明的年齡、在學、法定職業、曾任國民法官，不花 token），提到家人、需要判斷「重大」或說法模糊的才交給 AI。民眾寫的附件只是自述：「核對附件後送法院」要等你看過實際文件、打勾才算完成。只做初步整理，是否准許由法院審核決定。事由依國民法官法第 13～16 條、司法院常見問答 Q3606、Q3607。</p>
 </section>
 
 <section class="panel" id="noticePanel" hidden>

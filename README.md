@@ -11,7 +11,7 @@ NextWave 2026 AI法創黑客松參賽原型（**非官方，與司法院無關**
 |---|---|---|
 | 網址 | <https://ammieliu-jpg.github.io/juror-preview/> | <https://ammieliu-jpg.github.io/juror-preview/court.html> |
 | 做什麼 | 8 個像素場景，走一遍從收到通知、填調查表、選任宣誓到評議表決；右下角手機隨時問常見問答 | 統計回覆、預測到場人數；免除申請由「規則＋AI」初篩，標出需要承辦人員確認的人，需要補件的產生補件通知草稿 |
-| AI 怎麼用 | 瀏覽器內的中文語意模型（bge-small-zh-v1.5）比對 41 題司法院常見問答＋20 題補充，附出處；不需登入、問題不離開瀏覽器 | 規則先判年齡、在學、法定職業等明確情況（不花 token）；判不了才交給 Gemini（正式版換 TAIDE），結果經白名單檢查，最後由法院裁定 |
+| AI 怎麼用 | 瀏覽器內的中文語意模型（bge-small-zh-v1.5）比對 41 題司法院常見問答＋20 題補充，附出處；不需登入、問題不離開瀏覽器 | 規則先判年齡、在學、法定職業等明確情況（不花 token）；判不了才交給 Gemini（正式版換 TAIDE），結果經白名單檢查，最後由法院審核決定 |
 
 ## 快速開始
 
@@ -54,6 +54,7 @@ docs/                   說明文件
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架構圖：全貌、一筆回覆的旅程、初篩流程、問答流程、信任邊界、程式結構、部署、導入路徑（哪些是示範外殼、哪些能帶走） |
 | [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) | 安全與架構審查：所有發現與處理狀態 |
 | [docs/INTEGRATION.md](docs/INTEGRATION.md) | 介接規格：不用知道司法院內部系統也接得上（輸入輸出格式、匯入表格檔、三種接法、導入前要確認的事） |
+| [docs/SELECTION.md](docs/SELECTION.md) | 國民法官怎麼選出來：備選、候選、調查表審核、選任期日四個階段，以及「除名」和「裁定不選任」的差別（依條文） |
 | [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md) | 表單、試算表、模組 4、Looker Studio、court.html 的欄位對照 |
 | [docs/SETUP.md](docs/SETUP.md) | Gemini 金鑰、Apps Script、網頁應用程式、儀表板、Looker Studio 設定步驟 |
 | [docs/REFACTORING.md](docs/REFACTORING.md) | 已完成與建議的重構、單元測試寫法與範例 |
@@ -71,4 +72,4 @@ docs/                   說明文件
 
 - 所有示範資料都是虛構的。示範表單**不是**法院的表單，請勿填寫真實個資。
 - 免費版 Gemini API 的資料可能被 Google 用來改進模型；正式上線應改用法院自建模型，個資不離開法院。
-- AI 結果只是初步整理，是否准許免除由法院裁定。
+- AI 結果只是初步整理，是否准許免除由法院審核決定。
