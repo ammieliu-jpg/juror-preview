@@ -112,10 +112,10 @@ test('summarize：筆數和編號由程式算，不用 AI', () => {
     { id: 'C057', c: { 'AI建議': '看起來不符合', '需人工確認': '是', '承辦待辦': '請人工審閱' } },
     { id: 'C023', c: { 'AI建議': '待 AI 判斷', '需人工確認': '是' } },
   ]);
-  assert.match(text, /^共 5 筆免除申請：可能符合 2 筆，資料不足 1 筆，看起來不符合 1 筆，尚未分類 1 筆。/);
+  assert.match(text, /^共 5 筆表明不能或拒絕擔任：可能符合 2 筆，資料不足 1 筆，看起來不符合 1 筆，尚未分類 1 筆。/);
   assert.match(text, /需要先處理（3 筆）：\nC046：請補診斷證明\nC057：請人工審閱\nC023：請人工審閱/);
   assert.match(text, /核對附件後可送法院（2 筆）：C007（附件已核對）、C055/);
-  assert.match(text, /是否准許由法院審核決定。$/);
+  assert.match(text, /是否除名由法院審核決定。$/);
   assert.match(S.summarize([]), /^共 0 筆/);
 });
 
@@ -196,7 +196,7 @@ test('noticeFor：只有沒附、附錯、說明不夠具體的才發補件通�
   const n = S.noticeFor(rule(c123), c123);
   assert.deepEqual(n.items, ['身分證明（身分證或戶口名簿）']);
   assert.match(n.text, /^候選國民法官 C123 您好/);
-  assert.match(n.text, /【　年　月　日】[\s\S]*是否准許免除，由法院審核決定。/);
+  assert.match(n.text, /【　年　月　日】[\s\S]*是否予以除名，由法院審核決定；依現有資料無法確認者，仍請於選任期日到庭。/);
   // 只差核對附件：不發
   const c055 = { id: 'C055', reasons: '年滿 70 歲以上', note: '我今年 72 歲。（附身分證影本）' };
   assert.equal(S.noticeFor(rule(c055), c055), null);

@@ -183,7 +183,7 @@ test('writeSummary：由程式統計，不呼叫 Gemini；同一人送出多次�
   env.writeSummary();
   assert.equal(env.llmCalls.length, calls, '產生摘要不可以呼叫 Gemini');
   const text = env.ss.getSheetByName('承辦摘要').data[0][1];
-  assert.match(text, /^共 2 筆免除申請/, 'C090 已改成到場，不算');
+  assert.match(text, /^共 2 筆表明不能或拒絕擔任/, 'C090 已改成到場，不算');
   assert.match(text, /C046：尚未分類/);
   assert.match(text, /核對附件後可送法院（1 筆）：C055/);
 });
