@@ -110,6 +110,10 @@ for (const [name, device, touch] of PUBLIC_DEVICES) {
     await p.check('#sv0');
     await p.check('#sv6');
     assert.match(await p.textContent('#svOut'), /不得擔任[\s\S]*得拒絕/);
+    await p.check('#sv7');
+    assert.match(await p.textContent('#svOut'), /第 13 條/, '第 13 條的情形也要提示不得擔任');
+    await p.click('.law13 summary');
+    assert.match(await p.textContent('.law13'), /褫奪公權[\s\S]*受破產宣告/, '展開看得到第 13 條逐款');
     assert.deepEqual(await docLayout(p, touch), [], '調查表說明');
     await p.click('#doc [data-close="1"]');
 
