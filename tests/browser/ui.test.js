@@ -228,7 +228,7 @@ test('民眾端（iPhone SE）：前後小測驗，玩之前全錯、玩之後�
 
 /* ---------- 法院端：電腦完整檢查，手機只確認不出錯 ---------- */
 
-test('法院端（電腦）：示範資料、附件勾選、摘要', async () => {
+test('法院端（電腦）：示範資料、附件核對、摘要', async () => {
   const p = await open({ viewport: { width: 1280, height: 800 } }, 'court.html');
   await p.click('#demo');
   await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 17);
@@ -240,8 +240,26 @@ test('法院端（電腦）：示範資料、附件勾選、摘要', async () =>
   const pending = async () => Number(await p.locator('.kpi').last().locator('b').textContent());
   const before = await pending();
   assert.ok(before > 0, '要有「待核對附件」');
-  await p.locator('#rows input[data-k]').first().check();
-  assert.equal(await pending(), before - 1, '勾「我已看過附件」後待核對少一筆');
+  // 附件核對：要打開附件才能標記；標「相符」後待核對少一筆
+  await p.locator('#rows tr', { hasText: 'C055' }).locator('.doc-btn').click();
+  assert.ok(await p.isVisible('#docDlg'), '按「查看附件」會打開附件視窗');
+  assert.match(await p.textContent('#docView'), /示範用虛構文件/);
+  assert.match(await p.textContent('#docInfo'), /已滿 70 歲/, '提示要核對什麼');
+  await p.click('#docOkBtn');
+  assert.equal(await pending(), before - 1, '標「相符」後待核對少一筆');
+  assert.match(await p.locator('#rows tr', { hasText: 'C055' }).textContent(), /附件已核對，可送法院/);
+
+  // C056：自稱民國 45 年次，附件是 46 年 → 不符，改人工審閱，不再算「待核對附件」
+  const chk = async () => Number(await p.locator('.kpi', { hasText: '需承辦確認' }).locator('b').textContent());
+  const chkBefore = await chk();
+  await p.locator('#rows tr', { hasText: 'C056' }).locator('.doc-btn').click();
+  assert.match(await p.textContent('#docView'), /民國 46 年/);
+  await p.fill('#docWhy', '出生年為民國 46 年，未滿 70 歲');
+  await p.click('#docBadBtn');
+  const row056 = await p.locator('#rows tr', { hasText: 'C056' }).textContent();
+  assert.match(row056, /附件與說明不符：出生年為民國 46 年，未滿 70 歲，請人工審閱/);
+  assert.equal(await chk(), chkBefore + 1, '不符的那筆改成需承辦確認');
+  assert.equal(await pending(), before - 2);
 
   // 補件通知草稿：單筆、全部
   assert.equal(await p.isVisible('#noticePanel'), false);
