@@ -191,7 +191,7 @@ function doGet(e) {
     const ai = {};
     AI_COLS.forEach(k => (ai[k] = r[cols.ai[k] - 1]));
     const ts = r[0] instanceof Date ? Utilities.formatDate(r[0], 'Asia/Taipei', 'yyyy/MM/dd HH:mm:ss') : String(r[0]);
-    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), files: cols.files ? String(r[cols.files - 1] || '') : '', ai };
+    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), files: cols.files ? String(r[cols.files - 1] || '') : undefined, ai };
   });
   return json_({ ok: true, rulesVersion: Screening.RULES_VERSION, generatedAt: new Date().toISOString(), rows });
 }
@@ -724,11 +724,23 @@ var Screening = (function () {
     if (c['AI建議'] === '看起來不符合' && c['類型'] !== '無') c = assign({}, c, { '對應事由': '無', '類型': '無' });
     if (c['承辦待辦'] == null && c['書記官待辦'] != null) { c = assign({}, c, { '承辦待辦': c['書記官待辦'] }); delete c['書記官待辦']; }
     if (/^可直接送法[官院]$/.test(c['承辦待辦'])) c = assign({}, c, { '承辦待辦': '核對附件後送法院' });
-    var doc = claimedDoc(app.note);
-    if (!doc) return c;
+    var doc = claimedDoc(app.note), att = attachment(app);
     var basis = c['對應事由'] !== '無' && c['對應事由'] !== '—' ? c['對應事由'] : String(app.reasons || '');
     var need = null;
     for (var i = 0; i < NEED_DOC.length; i++) if (NEED_DOC[i][0].test(basis)) { need = NEED_DOC[i]; break; }
+    // 資料來源有「附件」上傳欄時，以實際上傳為準：說明寫了「（附…）」但沒上傳，就是沒附
+    if (att.tracked && !att.uploaded && (doc || c['需人工確認'] === '否')) {
+      return assign({}, c, { '需人工確認': '是', noUpload: true,
+        '承辦待辦': '沒有上傳附件' + (doc ? '（說明寫附「' + doc + '」）' : '') + '，請補' + (need ? need[2] : '證明文件') });
+    }
+    // 有上傳、但說明沒寫附了什麼：規則以為沒附，改成核對上傳的檔案
+    if (att.tracked && att.uploaded && !doc) {
+      if (c.src === 'rule' && c['AI建議'] === '可能符合' && /^請補/.test(String(c['承辦待辦'] || ''))) {
+        return assign({}, c, { '需人工確認': '否', '承辦待辦': '核對上傳的附件（' + (need ? need[2] : '證明文件') + '）後送法院' });
+      }
+      return c;
+    }
+    if (!doc) return c;
     if (!need || need[1].test(doc)) return c;
     return assign({}, c, { '需人工確認': '是', '承辦待辦': '附件類型不符：寫的是「' + doc + '」，此事由應附' + need[2], docBad: true });
   }
@@ -773,13 +785,15 @@ var Screening = (function () {
     // 先看初篩對應的事由，對不上再看民眾勾選的事由
     var mapped = c['對應事由'] && !/^(無|—)$/.test(c['對應事由']) ? c['對應事由'] : '', box = String(app.reasons || '');
     var pick = function (list) { return (mapped && firstMatch(list, mapped)) || firstMatch(list, box); };
-    var need = pick(NEED_DOC), doc = claimedDoc(app.note), items = [];
+    var need = pick(NEED_DOC), doc = claimedDoc(app.note), att = attachment(app), items = [];
     if (c['AI建議'] === '資料不足') {
       var ask = pick(DETAIL_ASK);
       items = items.concat(ask ? ask[1] : ['您符合哪一款事由，以及實際的情況']);
     }
     // 沒附、或附錯（和 finalize 的附件核對同一套對照；AI 還沒判的申請也看得出來）
-    if (need && !doc) items.push(need[2]);
+    if (att.tracked && !att.uploaded) { if (need) items.push(need[2] + (doc ? '（您的說明寫了附「' + doc + '」，但表單沒有收到上傳的檔案）' : '')); }
+    else if (att.tracked && !doc) { /* 有上傳檔案、說明沒寫是什麼：交給承辦人員打開核對 */ }
+    else if (need && !doc) items.push(need[2]);
     else if (need && !need[1].test(doc)) items.push(need[2] + '（您寫的附件是「' + doc + '」，和申請的事由不同）');
     if (!items.length) return null;
     return { items: items, text: noticeText(app, items) };
@@ -919,11 +933,12 @@ var Screening = (function () {
   function rowsFromTable(table) {
     var c = mapColumns(table[0]);
     var fallback = c.id == null || c.reply == null;
-    if (fallback) c = { ts: 0, id: 1, reply: 2, reasons: 3, note: 4, files: 5 };
+    if (fallback) { c = { ts: 0, id: 1, reply: 2, reasons: 3, note: 4 }; if ((table[0] || []).length > 5) c.files = 5; }
     var get = function (r, k) { return c[k] == null || r[c[k]] == null ? '' : String(r[c[k]]).trim(); };
     var rows = [];
     table.slice(1).forEach(function (r, i) {
-      var row = { ts: get(r, 'ts') || '第 ' + (i + 2) + ' 列', id: get(r, 'id'), reply: get(r, 'reply'), reasons: get(r, 'reasons'), note: get(r, 'note'), files: get(r, 'files') };
+      var row = { ts: get(r, 'ts') || '第 ' + (i + 2) + ' 列', id: get(r, 'id'), reply: get(r, 'reply'), reasons: get(r, 'reasons'), note: get(r, 'note') };
+      if (c.files != null) row.files = get(r, 'files'); // 有上傳欄才帶 files（沒有這欄＝無法得知有沒有上傳）
       if (row.id || row.reply) rows.push(row);
     });
     return { rows: rows, columns: c, fallback: fallback };
@@ -938,6 +953,16 @@ var Screening = (function () {
   function fileLinks(s) {
     var m = String(s || '').match(/https:\/\/(?:drive|docs)\.google\.com\/[A-Za-z0-9_\-\/?=&.%]+/g) || [];
     return m.filter(function (u, i) { return m.indexOf(u) === i; }).slice(0, 5);
+  }
+
+  /**
+   * 這筆申請的附件狀態。資料來源有上傳欄（app.files 是字串）時 tracked＝true，以實際上傳為準；
+   * 沒有上傳欄（示範資料、舊表單）時只能看說明裡寫的「（附…）」。
+   * @returns {{claimed:string|null, uploaded:number, tracked:boolean}}
+   */
+  function attachment(app) {
+    var tracked = !!app && typeof app.files === 'string';
+    return { claimed: claimedDoc(app && app.note), uploaded: tracked ? fileLinks(app.files).length : 0, tracked: tracked };
   }
 
   /**
@@ -963,7 +988,7 @@ var Screening = (function () {
   return {
     RULES_VERSION: RULES_VERSION, RULES_PROMPT: RULES_PROMPT, ENUMS: ENUMS, INJECT: INJECT, NEED_DOC: NEED_DOC,
     clean: clean, wrapInput: wrapInput, buildPrompt: buildPrompt, parseJson: parseJson,
-    claimedDoc: claimedDoc, fileLinks: fileLinks, selfAge: selfAge, aboutOthers: aboutOthers, ruleClassify: ruleClassify, checkAI: checkAI,
+    claimedDoc: claimedDoc, fileLinks: fileLinks, attachment: attachment, selfAge: selfAge, aboutOthers: aboutOthers, ruleClassify: ruleClassify, checkAI: checkAI,
     pendingResult: pendingResult, finalize: finalize, summarize: summarize, noticeFor: noticeFor,
     normalizeReply: normalizeReply, isPlausibleId: isPlausibleId, sanitizeCell: sanitizeCell,
     parseCSV: parseCSV, csvUrl: csvUrl, mapColumns: mapColumns, rowsFromTable: rowsFromTable

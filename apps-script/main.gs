@@ -188,7 +188,7 @@ function doGet(e) {
     const ai = {};
     AI_COLS.forEach(k => (ai[k] = r[cols.ai[k] - 1]));
     const ts = r[0] instanceof Date ? Utilities.formatDate(r[0], 'Asia/Taipei', 'yyyy/MM/dd HH:mm:ss') : String(r[0]);
-    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), files: cols.files ? String(r[cols.files - 1] || '') : '', ai };
+    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), files: cols.files ? String(r[cols.files - 1] || '') : undefined, ai };
   });
   return json_({ ok: true, rulesVersion: Screening.RULES_VERSION, generatedAt: new Date().toISOString(), rows });
 }

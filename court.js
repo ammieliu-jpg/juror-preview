@@ -276,7 +276,9 @@
   function docBox(k, c, r) {
     var claimed = S.claimedDoc(r.note), st = docOk[k], n = S.fileLinks(r.files).length;
     if (!claimed && !n && !needsDocCheck(c)) return '';
-    var tag = st === true ? '<span class="doc done">✓ 附件已核對，可送法院</span>'
+    var att = S.attachment(r);
+    var tag = (c && c.noUpload) || (att.tracked && !att.uploaded && claimed) ? '<span class="doc bad">✗ 沒有上傳附件</span>'
+      : st === true ? '<span class="doc done">✓ 附件已核對，可送法院</span>'
       : st && st.bad ? '<span class="doc bad">✗ 附件與說明不符</span>'
       : needsDocCheck(c) ? '<span class="doc">待核對附件</span>' : '';
     return tag + (n ? '<span class="src">已上傳 ' + n + ' 個檔案</span>' : '') + '<button class="doc-btn" data-d="' + esc(k) + '">查看附件</button>';
@@ -308,6 +310,7 @@
         return '<a class="btn" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">開啟附件 ' + (i + 1) + '（Google 雲端硬碟，另開分頁）</a>';
       }).join('') + '<p class="fine">民眾在表單上傳的檔案，存在表單擁有者的雲端硬碟；要用有權限的 Google 帳號登入才看得到。</p></div>' + (d ? docSvg(d) : '')
       : d ? docSvg(d)
+      : S.attachment(r).tracked ? '<p class="empty"><b>民眾沒有上傳附件。</b>' + (claimed ? '說明裡寫了附「' + esc(claimed) + '」，但表單沒有收到檔案。' : '') + '請用「補件通知草稿」請他補。</p>'
       : '<p class="empty">' + (mode === 'demo' ? '這筆沒有附件檔。' : '這個資料來源沒有附件檔。正式導入時，這裡顯示官方系統收到的附件（見介接規格）；目前請對照紙本或郵寄的文件。') + '</p>';
     $('docInfo').innerHTML = '<dl><dt>民眾寫的附件</dt><dd>' + esc(claimed || '（說明中沒有寫）') + '</dd>' +
       '<dt>勾選事由</dt><dd>' + esc(r.reasons) + '</dd><dt>民眾說明</dt><dd>' + esc(r.note) + '</dd>' +
