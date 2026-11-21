@@ -706,7 +706,7 @@ function realReply(){
     ${['我會到場','我有「不得擔任」或「得拒絕」的情形（例如年滿 70 歲、學生、重大疾病、特定職業）','還在考慮，請再提醒我'].map((x,i)=>`<label><input type="radio" name="rp" id="rp${i}" value="${i}"> ${x}</label>`).join('')}
     <div id="rpEx" hidden><span class="field">勾選你的情形（可複選）</span><p class="fine">最後一項職業類屬於「不得擔任」，其他屬於「得拒絕」。</p>
       ${REASONS.map((x,i)=>`<label><input type="checkbox" id="rr${i}" value="${i}"> ${x}</label>`).join('')}
-      <label class="field" for="rpNote">具體情況說明</label><p class="fine">用自己的話寫出你的狀況，法院會依這段審核。記得準備證明文件。</p><textarea id="rpNote" rows="4" placeholder="先勾選上面的事由，這裡會出現填寫範例。"></textarea>
+      <label class="field" for="rpNote">具體情況說明</label><p class="fine">用自己的話寫出你的狀況，法院會依這段審核。證明文件在下一步開啟的表單上傳。</p><textarea id="rpNote" rows="4" placeholder="先勾選上面的事由，這裡會出現填寫範例。"></textarea>
       <div class="result"><b>寄回之後會怎樣？</b><br>法院會審核你的調查表，可能請你補交證明文件。確定不用來的，法院會寄書面通知告訴你<b>不用到庭</b>；還沒收到這份通知前，請照通知書上的日期到庭。到了選任當天才提出拒絕也可以，由法院當場決定。（國民法官法第 22、27 條）</div></div>
     <p class="warn" id="rpErr" hidden></p>
     <div class="row"><button class="btn" id="rpNext">下一步：確認內容</button><button class="btn alt" data-close="0">取消</button></div></div><div id="rpS2" hidden></div>`,(doc,close)=>{
@@ -725,7 +725,8 @@ function realReply(){
         const s2=$d('#rpS2'); $d('#rpS1').hidden=true; s2.hidden=false;
         s2.innerHTML=`<h3>確認送出</h3><div class="sub">送出後，示範的法院端儀表板會收到以下內容</div>
           <dl><dt>候選人編號</dt><dd>${esc(id)}</dd><dt>回覆</dt><dd><b>${['我會到場','有「不得擔任」或「得拒絕」的情形','還在考慮'][+r.value]}</b></dd>${rs.length?`<dt>事由</dt><dd>${esc(rs.join('、'))}</dd>`:''}${note?`<dt>說明</dt><dd>${esc(note)}</dd>`:''}</dl>
-          ${note&&link?`<p class="warn">為了保護你的健康等個人資料，說明不會放進網址。按「確定送出」時會自動複製說明，請在表單最後一題「具體情況說明」貼上。</p><div class="row"><button class="btn alt" type="button" id="rpCopy">先複製說明</button></div>`:''}
+          ${note&&link?`<p class="warn">為了保護你的健康等個人資料，說明不會放進網址。按「確定送出」時會自動複製說明，請在表單的「具體情況說明」那一題貼上。</p><div class="row"><button class="btn alt" type="button" id="rpCopy">先複製說明</button></div>`:''}
+          ${r.value==='1'&&link?`<p class="warn">證明文件請在表單的「附件」題上傳（Google 表單會請你先登入）。這是示範，請上傳虛構或打過馬賽克的圖片，不要上傳真的證件。</p>`:''}
           <div class="result">示範的法院端儀表板會即時統計回覆、預測到場人數；有「不得擔任」或「得拒絕」情形的回覆，會先整理給承辦人員，再由法院審核；確定不用來的，會收到不用到庭的通知。</div>
           <div class="row">${link?`<a class="btn" id="rpSend" href="${esc(link)}" target="_blank" rel="noopener">確定送出（開啟示範表單）</a>`:`<button class="btn" id="rpSend">確定送出（原型：表單尚未連結）</button>`}<button class="btn alt" id="rpBack">返回修改</button></div>`;
         $d('#rpBack').onclick=()=>{ s2.hidden=true; $d('#rpS1').hidden=false; $d('#rpErr').hidden=true; };

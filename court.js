@@ -186,9 +186,8 @@
     if (!r2.ok) throw new Error('HTTP ' + r2.status);
     var txt = await r2.text();
     if (/^\s*</.test(txt)) throw new Error('讀不到資料，請確認試算表已共用為「知道連結的任何人都能檢視」');
-    // 欄位：A 時間戳記，B 候選人編號，C 你的回覆，D 勾選的事由，E 具體情況說明
-    return S.parseCSV(txt).slice(1).filter(function (r) { return r[1] || r[2]; })
-      .map(function (r) { return { ts: r[0], id: r[1], reply: r[2], reasons: r[3] || '', note: r[4] || '' }; });
+    // 用標題找欄位（和匯入表格檔相同）；認不出時照表單順序：A 時間戳記、B 編號、C 回覆、D 事由、E 說明、F 附件
+    return S.rowsFromTable(S.parseCSV(txt)).rows;
   }
 
   async function load(fromDemo) {
@@ -272,12 +271,12 @@
 
   /** 附件狀態與「查看附件」按鈕。標記結果要在附件視窗裡做：沒打開附件就不能標記。 */
   function docBox(k, c, r) {
-    var claimed = S.claimedDoc(r.note), st = docOk[k];
-    if (!claimed && !needsDocCheck(c)) return '';
+    var claimed = S.claimedDoc(r.note), st = docOk[k], n = S.fileLinks(r.files).length;
+    if (!claimed && !n && !needsDocCheck(c)) return '';
     var tag = st === true ? '<span class="doc done">✓ 附件已核對，可送法院</span>'
       : st && st.bad ? '<span class="doc bad">✗ 附件與說明不符</span>'
       : needsDocCheck(c) ? '<span class="doc">待核對附件</span>' : '';
-    return tag + '<button class="doc-btn" data-d="' + esc(k) + '">查看附件</button>';
+    return tag + (n ? '<span class="src">已上傳 ' + n + ' 個檔案</span>' : '') + '<button class="doc-btn" data-d="' + esc(k) + '">查看附件</button>';
   }
 
   /** 示範附件：簡單的文件樣式＋浮水印，刻意不仿照任何官方證件的版面。 */
@@ -299,10 +298,13 @@
     var r = rows.filter(function (x) { return keyOf(x) === k; })[0];
     if (!r) return;
     docKey = k;
-    var claimed = S.claimedDoc(r.note), d = mode === 'demo' ? DEMO_DOCS[r.id] : null, c = view(r);
+    var claimed = S.claimedDoc(r.note), d = mode === 'demo' ? DEMO_DOCS[r.id] : null, c = view(r), links = S.fileLinks(r.files);
     var hint = claimed && DOC_HINT.filter(function (h) { return h[0].test(claimed); })[0];
     $('docTitle').textContent = '附件核對：' + r.id;
-    $('docView').innerHTML = d ? docSvg(d)
+    $('docView').innerHTML = links.length ? '<div class="files">' + links.map(function (u, i) {
+        return '<a class="btn" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">開啟附件 ' + (i + 1) + '（Google 雲端硬碟，另開分頁）</a>';
+      }).join('') + '<p class="fine">民眾在表單上傳的檔案，存在表單擁有者的雲端硬碟；要用有權限的 Google 帳號登入才看得到。</p></div>' + (d ? docSvg(d) : '')
+      : d ? docSvg(d)
       : '<p class="empty">' + (mode === 'demo' ? '這筆沒有附件檔。' : '這個資料來源沒有附件檔。正式導入時，這裡顯示官方系統收到的附件（見介接規格）；目前請對照紙本或郵寄的文件。') + '</p>';
     $('docInfo').innerHTML = '<dl><dt>民眾寫的附件</dt><dd>' + esc(claimed || '（說明中沒有寫）') + '</dd>' +
       '<dt>勾選事由</dt><dd>' + esc(r.reasons) + '</dd><dt>民眾說明</dt><dd>' + esc(r.note) + '</dd>' +

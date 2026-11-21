@@ -43,6 +43,7 @@ const FIELDS = {
   reply:   { re: /你的回覆|回覆/,   fallback: 3 },
   reasons: { re: /事由/,            fallback: 4 },
   note:    { re: /說明/,            fallback: 5 },
+  files:   { re: /附件|上傳/,       fallback: 0 }, // 選填：表單的「檔案上傳」題，沒有這題就是 0
 };
 /** AI 寫入的欄位（不存在就自動加在最右邊）。只能在最後面新增，不要改順序。 */
 const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '承辦待辦', 'AI 處理時間', '判斷來源', '規則版本'];
@@ -190,7 +191,7 @@ function doGet(e) {
     const ai = {};
     AI_COLS.forEach(k => (ai[k] = r[cols.ai[k] - 1]));
     const ts = r[0] instanceof Date ? Utilities.formatDate(r[0], 'Asia/Taipei', 'yyyy/MM/dd HH:mm:ss') : String(r[0]);
-    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), ai };
+    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), files: cols.files ? String(r[cols.files - 1] || '') : '', ai };
   });
   return json_({ ok: true, rulesVersion: Screening.RULES_VERSION, generatedAt: new Date().toISOString(), rows });
 }
@@ -887,14 +888,14 @@ var Screening = (function () {
    * 匯入表格（官方系統匯出的 CSV 等）：用標題文字找欄位，欄位順序不同也讀得到。
    * 對照規則和 Apps Script 的 FIELDS 相同；多了「時間」。
    */
-  var COLUMNS = { id: /候選人編號|編號/, reasons: /事由/, note: /說明/, ts: /時間|日期/, reply: /回覆|意願/ };
-  /** 比對順序：「回覆日期」要算時間、「事由說明」要算事由，所以回覆和說明排在後面。 */
-  var COLUMN_ORDER = ['id', 'reasons', 'note', 'ts', 'reply'];
+  var COLUMNS = { id: /候選人編號|編號/, reasons: /事由/, note: /說明/, files: /附件|上傳/, ts: /時間|日期/, reply: /回覆|意願/ };
+  /** 比對順序：「回覆日期」要算時間、「事由說明」要算事由，所以回覆和說明排在後面；「附件說明」算說明。 */
+  var COLUMN_ORDER = ['id', 'reasons', 'note', 'files', 'ts', 'reply'];
 
   /**
    * 標題列 → 各欄位在第幾欄（0 起算）；找不到的欄位沒有這個鍵。
    * @param {string[]} header
-   * @returns {{id?:number, reply?:number, reasons?:number, note?:number, ts?:number}}
+   * @returns {{id?:number, reply?:number, reasons?:number, note?:number, files?:number, ts?:number}}
    */
   function mapColumns(header) {
     var out = {};
@@ -909,8 +910,8 @@ var Screening = (function () {
   }
 
   /**
-   * 解析好的表格（第一列是標題）→ 儀表板用的資料列 { ts, id, reply, reasons, note }。
-   * 標題認不出編號或回覆時，照 Google 表單的順序讀：A 時間、B 編號、C 回覆、D 事由、E 說明。
+   * 解析好的表格（第一列是標題）→ 儀表板用的資料列 { ts, id, reply, reasons, note, files }。
+   * 標題認不出編號或回覆時，照 Google 表單的順序讀：A 時間、B 編號、C 回覆、D 事由、E 說明、F 附件。
    * 沒有時間欄就用「第 N 列」，讓每一列都有自己的鍵。
    * @param {string[][]} table
    * @returns {{rows:Array, columns:Object, fallback:boolean}}
@@ -918,14 +919,25 @@ var Screening = (function () {
   function rowsFromTable(table) {
     var c = mapColumns(table[0]);
     var fallback = c.id == null || c.reply == null;
-    if (fallback) c = { ts: 0, id: 1, reply: 2, reasons: 3, note: 4 };
+    if (fallback) c = { ts: 0, id: 1, reply: 2, reasons: 3, note: 4, files: 5 };
     var get = function (r, k) { return c[k] == null || r[c[k]] == null ? '' : String(r[c[k]]).trim(); };
     var rows = [];
     table.slice(1).forEach(function (r, i) {
-      var row = { ts: get(r, 'ts') || '第 ' + (i + 2) + ' 列', id: get(r, 'id'), reply: get(r, 'reply'), reasons: get(r, 'reasons'), note: get(r, 'note') };
+      var row = { ts: get(r, 'ts') || '第 ' + (i + 2) + ' 列', id: get(r, 'id'), reply: get(r, 'reply'), reasons: get(r, 'reasons'), note: get(r, 'note'), files: get(r, 'files') };
       if (row.id || row.reply) rows.push(row);
     });
     return { rows: rows, columns: c, fallback: fallback };
+  }
+
+  /**
+   * 表單「檔案上傳」題的答案 → 附件連結。只接受 Google 雲端硬碟／文件的 https 連結，最多 5 個；
+   * 其他文字（包括 javascript: 之類的網址）一律忽略，畫面只會產生這些連結。
+   * @param {string} s  例如 "https://drive.google.com/open?id=abc, https://drive.google.com/open?id=def"
+   * @returns {string[]}
+   */
+  function fileLinks(s) {
+    var m = String(s || '').match(/https:\/\/(?:drive|docs)\.google\.com\/[A-Za-z0-9_\-\/?=&.%]+/g) || [];
+    return m.filter(function (u, i) { return m.indexOf(u) === i; }).slice(0, 5);
   }
 
   /**
@@ -951,7 +963,7 @@ var Screening = (function () {
   return {
     RULES_VERSION: RULES_VERSION, RULES_PROMPT: RULES_PROMPT, ENUMS: ENUMS, INJECT: INJECT, NEED_DOC: NEED_DOC,
     clean: clean, wrapInput: wrapInput, buildPrompt: buildPrompt, parseJson: parseJson,
-    claimedDoc: claimedDoc, selfAge: selfAge, aboutOthers: aboutOthers, ruleClassify: ruleClassify, checkAI: checkAI,
+    claimedDoc: claimedDoc, fileLinks: fileLinks, selfAge: selfAge, aboutOthers: aboutOthers, ruleClassify: ruleClassify, checkAI: checkAI,
     pendingResult: pendingResult, finalize: finalize, summarize: summarize, noticeFor: noticeFor,
     normalizeReply: normalizeReply, isPlausibleId: isPlausibleId, sanitizeCell: sanitizeCell,
     parseCSV: parseCSV, csvUrl: csvUrl, mapColumns: mapColumns, rowsFromTable: rowsFromTable
