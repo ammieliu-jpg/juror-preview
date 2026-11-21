@@ -91,6 +91,8 @@ button.badb{border-color:var(--bad);color:var(--bad)}
 #noticeText{width:100%;box-sizing:border-box;font:inherit;font-size:14px;line-height:1.6;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
 #summary{white-space:pre-wrap;margin:0}
 .empty{color:var(--mute);padding:20px 0;text-align:center}
+#cfgMsg{color:var(--bad);font-size:14px;font-weight:700;margin:8px 0 0}
+#cfgMsg:empty{display:none}
 .warnbox{border-color:var(--warn);color:var(--warn);font-size:14px}
 @media (prefers-reduced-motion:reduce){tr.new td{animation:none}}
 /* 手機：KPI 兩欄並排，不必滑過七張大卡片才看到待審清單 */
@@ -142,6 +144,7 @@ button.badb{border-color:var(--bad);color:var(--bad)}
     <label>模型名稱
       <input id="model" value="gemini-2.5-flash"></label>
     <div><button class="primary" id="save">儲存並載入</button> <button id="clearCache">清除 AI 分類快取</button> <button id="forget">清除這台電腦的設定與金鑰</button></div>
+    <p class="warn" id="cfgMsg" role="alert"></p>
     <p class="fine">「匯入表格檔」讀官方系統匯出的 CSV（UTF-8 或 Big5 都可以），用標題找欄位：編號、回覆、事由、說明。只在這台電腦用規則判，不上傳、不送 AI。欄位說明見 docs/INTEGRATION.md。</p>
     <p class="fine">沒有金鑰也能用：規則判得了的照常分類，其餘標「待 AI」請人工審閱。示範時請只用虛構資料：免費版 Gemini 的資料可能被 Google 用來改進模型。建議在 Google Cloud 把金鑰限制為只能呼叫 Generative Language API。</p>
   </div>

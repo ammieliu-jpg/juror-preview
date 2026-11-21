@@ -181,7 +181,9 @@
       return j.rows;
     }
     var url = S.csvUrl(cfg.sheetUrl, cfg.sheetName);
-    if (!url) throw new Error('請在「設定」貼上試算表網址，或按「載入示範資料」');
+    if (!url) throw new Error(/docs\.google\.com\/forms\//.test(cfg.sheetUrl || '')
+      ? '這是表單的網址。請貼「回覆試算表」的網址（docs.google.com/spreadsheets/…）：在表單的「回覆」分頁按「在試算表中查看」，再複製網址列'
+      : '請在「設定」貼上試算表網址，或按「載入示範資料」');
     var r2 = await fetch(url, { cache: 'no-store' });
     if (!r2.ok) throw new Error('HTTP ' + r2.status);
     var txt = await r2.text();
@@ -199,13 +201,14 @@
       show(all, msg, fromDemo ? 'demo' : 'remote');
     } catch (err) {
       $('status').textContent = '讀取失敗：' + err.message;
-      if (!fromDemo) $('settings').open = true;
+      if (!fromDemo) { $('settings').open = true; $('cfgMsg').textContent = '讀取失敗：' + err.message; }
     }
   }
 
   /** 讀到的資料列 → 去重、顯示、分類。三種來源（設定、示範、匯入）共用。 */
   function show(all, msg, m) {
     mode = m;
+    $('cfgMsg').textContent = '';
     if (m !== 'remote') remoteVersion = null;
     var latest = latestPerId(all);
     rows = latest.rows;
