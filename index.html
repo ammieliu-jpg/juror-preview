@@ -69,7 +69,7 @@ body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-siz
 .doc .btn{font:inherit;font-weight:700;background:var(--paper-ink);color:var(--paper);border:0;padding:8px 16px;cursor:pointer;margin-top:6px}
 .doc .btn:focus-visible{outline:3px solid var(--brass)}
 .doc .fine{font-size:13px;color:#7a6a55}
-.doc details.law13{margin:4px 0 6px;font-size:13px}
+.doc details.law13{margin:-2px 0 6px 26px;font-size:13px}
 .doc details.law13 summary{cursor:pointer;font-weight:700;padding:4px 0}
 .doc details.law13 ol{margin:4px 0;padding-left:22px;line-height:1.6}
 /* 文件是淺色底：原生勾選框要用淺色樣式，否則沿用 :root 的 dark，沒勾的也是實心深色方塊，看起來像已勾選 */
@@ -654,8 +654,7 @@ function surveyModal(next){
   const items=[['年滿 70 歲以上','refuse'],['具有老師或學生身分','refuse'],['要照顧家人或養育小孩，執行職務有困難','refuse'],['有重大疾病、傷害或身心因素','refuse'],['重大受災戶，需要處理生活重建','refuse'],['5 年內擔任過國民法官','refuse'],['職業或身分不能擔任（如法官、檢察官、律師、警察、軍人）','cannot'],['有犯罪紀錄、褫奪公權、受監護宣告等情形','record'],['以上都沒有','none']];
   const NONE=items.length-1;
   return modal(`<h3>參與資格及意願調查表</h3><div class="sub">體驗用簡化版<span class="practice">練習用，不會送出</span></div>
-    <p class="fine">你有沒有以下情形？可以複選。</p>${items.map(([t],i)=>`<label><input type="checkbox" id="sv${i}" value="${i}"> ${t}</label>`).join('')}
-    ${LAW13}
+    <p class="fine">你有沒有以下情形？可以複選。</p>${items.map(([t,k],i)=>`<label><input type="checkbox" id="sv${i}" value="${i}"> ${t}</label>${k==='record'?LAW13:''}`).join('')}
     <div class="result" id="svOut">勾選後，這裡會即時顯示初篩結果。</div>
     <a class="aicta" id="svAi" href="${PARTYROCK}" target="_blank" rel="noopener">🤖 不確定自己符不符合？讓 AI 幫你初篩並寫好說明 ↗<small>另開 PartyRock（需登入）。用白話描述狀況就好，不要輸入姓名、身分證字號等認得出你的資料</small></a>
     <button class="btn" data-close="1">${next||'寄回調查表'}</button>`, doc=>{
@@ -717,8 +716,7 @@ function realReply(){
     <span class="field">你的回覆</span>
     ${['我會到場','我有「不得擔任」或「得拒絕」的情形（例如年滿 70 歲、學生、重大疾病、特定職業）','還在考慮，請再提醒我'].map((x,i)=>`<label><input type="radio" name="rp" id="rp${i}" value="${i}"> ${x}</label>`).join('')}
     <div id="rpEx" hidden><span class="field">勾選你的情形（可複選）</span><p class="fine">最後一項職業類屬於「不得擔任」，其他屬於「得拒絕」。</p>
-      ${REASONS.map((x,i)=>`<label><input type="checkbox" id="rr${i}" value="${i}"> ${x}</label>`).join('')}
-      ${LAW13}
+      ${REASONS.map((x,i)=>`<label><input type="checkbox" id="rr${i}" value="${i}"> ${x}</label>${x===REASONS[7]?LAW13:''}`).join('')}
       <label class="field" for="rpNote">具體情況說明</label><p class="fine">用自己的話寫出你的狀況，法院會依這段審核。證明文件在下一步開啟的表單上傳。</p><textarea id="rpNote" rows="4" placeholder="先勾選上面的事由，這裡會出現填寫範例。"></textarea>
       <div class="result"><b>寄回之後會怎樣？</b><br>法院會審核你的調查表，可能請你補交證明文件。確定不用來的，法院會寄書面通知告訴你<b>不用到庭</b>；還沒收到這份通知前，請照通知書上的日期到庭。到了選任當天才提出拒絕也可以，由法院當場決定。（國民法官法第 22、27 條）</div></div>
     <p class="warn" id="rpErr" hidden></p>
