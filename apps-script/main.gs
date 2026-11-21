@@ -40,6 +40,7 @@ const FIELDS = {
   reply:   { re: /你的回覆|回覆/,   fallback: 3 },
   reasons: { re: /事由/,            fallback: 4 },
   note:    { re: /說明/,            fallback: 5 },
+  files:   { re: /附件|上傳/,       fallback: 0 }, // 選填：表單的「檔案上傳」題，沒有這題就是 0
 };
 /** AI 寫入的欄位（不存在就自動加在最右邊）。只能在最後面新增，不要改順序。 */
 const AI_COLS = ['AI 對應事由', 'AI 類型', 'AI 建議', '需人工確認', 'AI 理由', '承辦待辦', 'AI 處理時間', '判斷來源', '規則版本'];
@@ -187,7 +188,7 @@ function doGet(e) {
     const ai = {};
     AI_COLS.forEach(k => (ai[k] = r[cols.ai[k] - 1]));
     const ts = r[0] instanceof Date ? Utilities.formatDate(r[0], 'Asia/Taipei', 'yyyy/MM/dd HH:mm:ss') : String(r[0]);
-    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), ai };
+    return { ts, id: String(r[cols.id - 1]), reply: String(r[cols.reply - 1]), reasons: String(r[cols.reasons - 1]), note: String(r[cols.note - 1]), files: cols.files ? String(r[cols.files - 1] || '') : '', ai };
   });
   return json_({ ok: true, rulesVersion: Screening.RULES_VERSION, generatedAt: new Date().toISOString(), rows });
 }

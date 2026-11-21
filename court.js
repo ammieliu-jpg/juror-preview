@@ -60,6 +60,27 @@
     return rows.sort(function (a, b) { return a.ts < b.ts ? -1 : 1; });
   })();
 
+  /*
+   * 示範附件：只在「載入示範資料」時使用，全部是虛構文件，畫面上有浮水印。
+   * 用來展示承辦人員「打開附件 → 對照說明 → 標記結果」的流程；正式版改成顯示官方系統的附件。
+   * C056 故意做成和說明不符（自稱民國 45 年次，文件是 46 年，未滿 70 歲），C161 是附錯文件。
+   */
+  var DEMO_DOCS = {
+    C007: ['學生證（影本）', [['學校', '○○大學'], ['系級', '法律學系 三年級'], ['姓名', '林○○'], ['有效期限', '2027 年 7 月 31 日']]],
+    C037: ['服務證明書', [['服務單位', '○○縣政府警察局○○分局'], ['職稱', '警員'], ['姓名', '陳○○'], ['任職期間', '2019 年 9 月起迄今']]],
+    C055: ['身分證明文件（影本）', [['姓名', '王○○'], ['出生日期', '民國 43 年 5 月 2 日'], ['性別', '男']]],
+    C056: ['身分證明文件（影本）', [['姓名', '張○○'], ['出生日期', '民國 46 年 3 月 18 日'], ['性別', '女']]],
+    C075: ['在職證明書', [['公司', '○○保全股份有限公司'], ['職稱', '保全員'], ['姓名', '李○○'], ['到職日', '2021 年 4 月 1 日']]],
+    C085: ['身分證明文件（影本）', [['姓名', '黃○○'], ['出生日期', '民國 45 年 8 月 9 日'], ['性別', '男']]],
+    C090: ['戶口名簿（影本）', [['戶長', '吳○○（本人）'], ['配偶', '吳○○（現住○○市）'], ['長女', '吳○○，民國 113 年生']]],
+    C107: ['身分證明文件（影本）', [['姓名', '許○○'], ['出生日期', '民國 40 年 1 月 25 日'], ['性別', '女']]],
+    C150: ['服務證明書', [['服務單位', '臺灣○○地方檢察署'], ['職稱', '書記官'], ['姓名', '鄭○○'], ['任職期間', '2016 年 2 月起迄今']]],
+    C161: ['戶口名簿（影本）', [['戶長', '周○○（本人）'], ['母', '周○○'], ['弟', '周○○']]]
+  };
+  /** 看附件時要核對什麼（依附件種類）。 */
+  var DOC_HINT = [[/身分/, '出生年月日：算到今年是否已滿 70 歲'], [/學生證|在學/, '學校、身分與有效期限'],
+    [/服務|在職/, '服務單位與職稱，是否屬第 14 條列舉的職業'], [/診斷/, '病名、日期與醫師建議'], [/戶口/, '家庭成員和申請事由有沒有關係'], [/受災|災害/, '受災地址與日期']];
+
   /* ---------- 設定與快取 ---------- */
 
   var $ = function (id) { return document.getElementById(id); };
@@ -93,7 +114,7 @@
   var rows = [], seen = null, timer = null, running = false, mode = 'remote';
   // Apps Script 回報的規則版本。和這一頁的不同，代表有人改了 lib/screening.js 卻還沒重新部署 Apps Script（或反過來）
   var remoteVersion = null;
-  // 承辦人員看過實際附件後打勾；沒打勾的「核對附件後送法院」不算完成
+  // 承辦人員打開附件後標記：true＝相符；{bad:true, why}＝不符，改人工審閱。沒標記的「核對附件後送法院」不算完成
   var docOk = local.get('docOk', {});
 
   function fillForm() {
@@ -126,7 +147,11 @@
     };
   }
   /** 畫面用的最終結果（共用 finalize：欄位一致＋附件核對）。 */
-  function view(r) { return S.finalize(cache[keyOf(r)], r); }
+  function view(r) {
+    var c = S.finalize(cache[keyOf(r)], r), st = docOk[keyOf(r)];
+    if (c && st && st.bad) c = Object.assign({}, c, { '需人工確認': '是', '承辦待辦': '附件與說明不符' + (st.why ? '：' + st.why : '') + '，請人工審閱', docHuman: true });
+    return c;
+  }
   /** 不需要追問、只差承辦人員核對附件的申請。 */
   var needsDocCheck = function (c) { return c && c.src !== 'pending' && c['需人工確認'] === '否'; };
 
@@ -161,9 +186,8 @@
     if (!r2.ok) throw new Error('HTTP ' + r2.status);
     var txt = await r2.text();
     if (/^\s*</.test(txt)) throw new Error('讀不到資料，請確認試算表已共用為「知道連結的任何人都能檢視」');
-    // 欄位：A 時間戳記，B 候選人編號，C 你的回覆，D 勾選的事由，E 具體情況說明
-    return S.parseCSV(txt).slice(1).filter(function (r) { return r[1] || r[2]; })
-      .map(function (r) { return { ts: r[0], id: r[1], reply: r[2], reasons: r[3] || '', note: r[4] || '' }; });
+    // 用標題找欄位（和匯入表格檔相同）；認不出時照表單順序：A 時間戳記、B 編號、C 回覆、D 事由、E 說明、F 附件
+    return S.rowsFromTable(S.parseCSV(txt)).rows;
   }
 
   async function load(fromDemo) {
@@ -222,7 +246,7 @@
     var done = ex.filter(function (r) { var c = view(r); return c && c.src !== 'pending'; });
     var chk = ex.filter(function (r) { var c = view(r); return c && c['需人工確認'] === '是'; });
     var byRule = done.filter(function (r) { return cache[keyOf(r)].src === 'rule'; }).length, byAI = done.length - byRule;
-    var docTodo = ex.filter(function (r) { return needsDocCheck(view(r)) && !docOk[keyOf(r)]; });
+    var docTodo = ex.filter(function (r) { return needsDocCheck(view(r)) && docOk[keyOf(r)] !== true; });
     var notices = ex.filter(function (r) { return S.noticeFor(view(r), r); });
     $('kpis').innerHTML = [
       [rows.length, '已回覆人數'], [go.length, '回覆會到場'], [ex.length, '表明不能或拒絕擔任'], [und.length, '尚未決定'],
@@ -240,16 +264,61 @@
         '<td>' + (c ? esc(c['對應事由']) : '<span class="status">分類中…</span>') + '</td><td>' + (c ? esc(c['類型']) : '') + '</td>' +
         '<td>' + (c ? '<span class="who ' + src + '">' + SRC[src] + '</span> <span class="badge ' + cls + '">' + esc(adv) + '</span><div class="src">' + esc(c['理由']) + (c['依據'] ? '<br>' + esc(c['依據']) : '') + '</div>' : '') + '</td>' +
         '<td>' + (c ? (c['需人工確認'] === '是' ? '<span class="check">是</span>' : '否') : '') + '</td>' +
-        '<td' + (c && c.docBad ? ' class="check"' : '') + '>' + (c ? esc(c['承辦待辦']) : '') + docBox(k, c) +
+        '<td' + (c && c.docBad ? ' class="check"' : '') + '>' + (c ? esc(c['承辦待辦']) : '') + docBox(k, c, r) +
         (S.noticeFor(c, r) ? '<button class="notice-btn" data-n="' + esc(k) + '">補件通知草稿</button>' : '') + '</td></tr>';
     }).join('');
   }
 
-  /** 「核對附件後送法院」的勾選框：承辦人員看過實際文件才勾。系統只能比對民眾寫的附件名稱。 */
-  function docBox(k, c) {
-    if (!needsDocCheck(c)) return '';
-    return docOk[k] ? '<label class="doc done"><input type="checkbox" data-k="' + esc(k) + '" checked> 附件已核對，可送法院</label>'
-      : '<label class="doc"><input type="checkbox" data-k="' + esc(k) + '"> 我已看過附件</label>';
+  /** 附件狀態與「查看附件」按鈕。標記結果要在附件視窗裡做：沒打開附件就不能標記。 */
+  function docBox(k, c, r) {
+    var claimed = S.claimedDoc(r.note), st = docOk[k], n = S.fileLinks(r.files).length;
+    if (!claimed && !n && !needsDocCheck(c)) return '';
+    var tag = st === true ? '<span class="doc done">✓ 附件已核對，可送法院</span>'
+      : st && st.bad ? '<span class="doc bad">✗ 附件與說明不符</span>'
+      : needsDocCheck(c) ? '<span class="doc">待核對附件</span>' : '';
+    return tag + (n ? '<span class="src">已上傳 ' + n + ' 個檔案</span>' : '') + '<button class="doc-btn" data-d="' + esc(k) + '">查看附件</button>';
+  }
+
+  /** 示範附件：簡單的文件樣式＋浮水印，刻意不仿照任何官方證件的版面。 */
+  function docSvg(d) {
+    var rowsSvg = d[1].map(function (f, i) {
+      var y = 118 + i * 44;
+      return '<text x="40" y="' + y + '" font-size="17" fill="#6b6676">' + esc(f[0]) + '</text><text x="170" y="' + y + '" font-size="19" fill="#22202a">' + esc(f[1]) + '</text>' +
+        '<line x1="40" x2="520" y1="' + (y + 14) + '" y2="' + (y + 14) + '" stroke="#e4dfd3"/>';
+    }).join('');
+    return '<svg viewBox="0 0 560 340" role="img" aria-label="' + esc(d[0]) + '（示範用虛構文件）" style="width:100%;height:auto;display:block;font-family:var(--f)">' +
+      '<rect x="1" y="1" width="558" height="338" rx="10" fill="#fdfcf8" stroke="#cfc8b8"/>' +
+      '<text x="40" y="62" font-size="24" font-weight="700" fill="#22202a">' + esc(d[0]) + '</text>' + rowsSvg +
+      '<text x="280" y="210" font-size="44" font-weight="700" fill="#b33a32" fill-opacity=".16" text-anchor="middle" transform="rotate(-18 280 190)">示範用虛構文件</text>' +
+      '<text x="40" y="318" font-size="13" fill="#9a94a6">競賽示範・非真實文件・姓名與資料皆為虛構</text></svg>';
+  }
+
+  var docKey = null;
+  function openDoc(k) {
+    var r = rows.filter(function (x) { return keyOf(x) === k; })[0];
+    if (!r) return;
+    docKey = k;
+    var claimed = S.claimedDoc(r.note), d = mode === 'demo' ? DEMO_DOCS[r.id] : null, c = view(r), links = S.fileLinks(r.files);
+    var hint = claimed && DOC_HINT.filter(function (h) { return h[0].test(claimed); })[0];
+    $('docTitle').textContent = '附件核對：' + r.id;
+    $('docView').innerHTML = links.length ? '<div class="files">' + links.map(function (u, i) {
+        return '<a class="btn" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">開啟附件 ' + (i + 1) + '（Google 雲端硬碟，另開分頁）</a>';
+      }).join('') + '<p class="fine">民眾在表單上傳的檔案，存在表單擁有者的雲端硬碟；要用有權限的 Google 帳號登入才看得到。</p></div>' + (d ? docSvg(d) : '')
+      : d ? docSvg(d)
+      : '<p class="empty">' + (mode === 'demo' ? '這筆沒有附件檔。' : '這個資料來源沒有附件檔。正式導入時，這裡顯示官方系統收到的附件（見介接規格）；目前請對照紙本或郵寄的文件。') + '</p>';
+    $('docInfo').innerHTML = '<dl><dt>民眾寫的附件</dt><dd>' + esc(claimed || '（說明中沒有寫）') + '</dd>' +
+      '<dt>勾選事由</dt><dd>' + esc(r.reasons) + '</dd><dt>民眾說明</dt><dd>' + esc(r.note) + '</dd>' +
+      '<dt>初篩結果</dt><dd>' + (c ? esc(c['對應事由'] + '｜' + c['AI建議']) : '分類中') + '</dd>' +
+      (hint ? '<dt>請核對</dt><dd><b>' + esc(hint[1]) + '</b></dd>' : '') + '</dl>';
+    var st = docOk[k];
+    $('docWhy').value = st && st.why || '';
+    $('docState').textContent = st === true ? '目前標記：相符' : st && st.bad ? '目前標記：不符' : '尚未標記';
+    $('docDlg').showModal();
+  }
+  function markDoc(v) {
+    if (!docKey) return;
+    if (v === null) delete docOk[docKey]; else docOk[docKey] = v;
+    local.set('docOk', docOk); $('docDlg').close(); render();
   }
 
   /* ---------- Gemini（只有公開試算表／示範模式、而且有填金鑰時才用） ---------- */
@@ -299,7 +368,7 @@
     if (!ex.length) { $('summary').textContent = '目前沒有表明不能或拒絕擔任的回覆。'; return; }
     $('summary').textContent = S.summarize(ex.map(function (r) {
       var k = keyOf(r);
-      return { id: r.id, c: view(r) || S.pendingResult('分類中，請稍後'), checked: !!docOk[k] };
+      return { id: r.id, c: view(r) || S.pendingResult('分類中，請稍後'), checked: docOk[k] === true };
     }));
   }
 
@@ -364,12 +433,14 @@
       navigator.clipboard.writeText(t.value).then(function () { $('noticeStatus').textContent = '已複製'; }, function () { t.select(); $('noticeStatus').textContent = '請按 Ctrl+C 複製'; });
     } catch (err) { t.select(); $('noticeStatus').textContent = '請按 Ctrl+C 複製'; }
   };
-  $('rows').addEventListener('change', function (e) {
-    var k = e.target.getAttribute && e.target.getAttribute('data-k');
-    if (!k) return;
-    if (e.target.checked) docOk[k] = true; else delete docOk[k];
-    local.set('docOk', docOk); render();
+  $('rows').addEventListener('click', function (e) {
+    var k = e.target.getAttribute && e.target.getAttribute('data-d');
+    if (k) openDoc(k);
   });
+  $('docOkBtn').onclick = function () { markDoc(true); };
+  $('docBadBtn').onclick = function () { markDoc({ bad: true, why: $('docWhy').value.trim().slice(0, 40) }); };
+  $('docClear').onclick = function () { markDoc(null); };
+  $('docClose').onclick = function () { $('docDlg').close(); };
   $('auto').onchange = function (e) { clearInterval(timer); if (e.target.checked) timer = setInterval(function () { load(); }, 20000); };
 
   // 清掉舊版本的快取，避免 localStorage 越積越多
