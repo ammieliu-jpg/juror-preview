@@ -651,7 +651,7 @@ function quizModal(before){
 // next：按鈕文字（遊戲第 2 關是「寄回調查表」；從開頭或結尾進來是「下一步」）
 function surveyModal(next){
   // [選項, 類型]：refuse＝第 16 條得拒絕；cannot＝第 14 條職業；record＝第 13 條自身因素；none＝以上都沒有
-  const items=[['年滿 70 歲以上','refuse'],['具有老師或學生身分','refuse'],['要照顧家人或養育小孩，執行職務有困難','refuse'],['有重大疾病、傷害或身心因素','refuse'],['重大受災戶，需要處理生活重建','refuse'],['5 年內擔任過國民法官','refuse'],['職業或身分不能擔任（如法官、檢察官、律師、警察、軍人）','cannot'],['有犯罪紀錄、褫奪公權、受監護宣告等法定情形（第 13 條）','record'],['以上都沒有','none']];
+  const items=[['年滿 70 歲以上','refuse'],['具有老師或學生身分','refuse'],['要照顧家人或養育小孩，執行職務有困難','refuse'],['有重大疾病、傷害或身心因素','refuse'],['重大受災戶，需要處理生活重建','refuse'],['5 年內擔任過國民法官','refuse'],['職業或身分不能擔任（如法官、檢察官、律師、警察、軍人）','cannot'],['有犯罪紀錄、褫奪公權、受監護宣告等情形','record'],['以上都沒有','none']];
   const NONE=items.length-1;
   return modal(`<h3>參與資格及意願調查表</h3><div class="sub">體驗用簡化版<span class="practice">練習用，不會送出</span></div>
     <p class="fine">你有沒有以下情形？可以複選。</p>${items.map(([t],i)=>`<label><input type="checkbox" id="sv${i}" value="${i}"> ${t}</label>`).join('')}
@@ -692,9 +692,9 @@ function oathModal(){
    這裡的 Google 表單是競賽示範用的替身，代表法院端收到資料後的流程；真正的回覆走官方線上調查表。 */
 const FORM={url:'https://docs.google.com/forms/d/e/1FAIpQLSe3PPB_zPOpHZhpuS3HWQG38fQp3KDoHWHSf30XxvKTyTq3GQ/viewform',id:'entry.1612295714',reply:'entry.1258938889',reasons:'entry.1051708947',note:'entry.964700410'}; // 填入 Google 表單「預先填入連結」的代號
 // 文字要和 Google 表單第 3 題的核取方塊選項完全一樣
-const REASONS=['年滿 70 歲以上','具有老師或學生身分','要照顧家人或養育小孩，執行職務有困難','有重大疾病、傷害或身心因素','重大受災戶，需要處理生活重建','5 年內擔任過國民法官','職業或身分不能擔任（如法官、檢察官、律師、警察、軍人）','有犯罪紀錄、褫奪公權、受監護宣告等法定情形（第 13 條）','其他（請在說明欄寫明）'];
+const REASONS=['年滿 70 歲以上','具有老師或學生身分','要照顧家人或養育小孩，執行職務有困難','有重大疾病、傷害或身心因素','重大受災戶，需要處理生活重建','5 年內擔任過國民法官','職業或身分不能擔任（如法官、檢察官、律師、警察、軍人）','有犯罪紀錄、褫奪公權、受監護宣告等情形','其他（請在說明欄寫明）'];
 // 第 13 條逐款（國民法官法），調查表和試填都用這份白話清單
-const LAW13=`<details class="law13"><summary>第 13 條包括哪些情形？</summary><ol class="fine">
+const LAW13=`<details class="law13"><summary>這一項包括哪些情形？</summary><ol class="fine">
   <li>褫奪公權，尚未復權</li><li>曾任公務人員受免除職務或撤職處分，停止任用期間未滿</li><li>現任公務人員受休職、停職處分，期間未滿</li>
   <li>人身自由依法受拘束中</li><li>因案被提起公訴、聲請簡易判決處刑或自訴，尚未判決確定</li><li>曾受有期徒刑以上刑之宣告確定</li>
   <li>受有期徒刑以上刑之宣告確定，現在緩刑期內或期滿後未滿 2 年</li><li>在緩起訴期間內，或期滿後未滿 2 年</li>
