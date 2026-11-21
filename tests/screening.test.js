@@ -167,7 +167,7 @@ test('匯入表格：用標題找欄位，順序不同、標題不同也讀得�
   assert.deepEqual(S.mapColumns(['候選人編號', '回覆日期', '你的回覆', '勾選的事由', '具體情況說明']), { id: 0, ts: 1, reply: 2, reasons: 3, note: 4 });
   const t = S.rowsFromTable(S.parseCSV('填答時間,候選人編號,回覆意願,勾選事由,具體說明\n2026/11/03,C201,申請拒絕被選任,年滿 70 歲以上,"我今年 75 歲，行動不便"\n,,,,\n'));
   assert.equal(t.fallback, false);
-  assert.deepEqual(t.rows, [{ ts: '2026/11/03', id: 'C201', reply: '申請拒絕被選任', reasons: '年滿 70 歲以上', note: '我今年 75 歲，行動不便', files: '' }], '空白列要略過');
+  assert.deepEqual(t.rows, [{ ts: '2026/11/03', id: 'C201', reply: '申請拒絕被選任', reasons: '年滿 70 歲以上', note: '我今年 75 歲，行動不便' }], '空白列要略過');
   assert.equal(S.normalizeReply(t.rows[0].reply), '申請免除', '「拒絕被選任」就是申請免除');
 });
 
@@ -176,7 +176,7 @@ test('匯入表格：標題認不出來時照 A–E 欄；沒有時間欄用列�
   assert.equal(a.fallback, true);
   assert.equal(a.rows[0].id, 'C001');
   const b = S.rowsFromTable(S.parseCSV('編號\t回覆\t事由\t說明\nC002\t到場\t\t\n', '\t'));
-  assert.deepEqual(b.rows[0], { ts: '第 2 列', id: 'C002', reply: '到場', reasons: '', note: '', files: '' });
+  assert.deepEqual(b.rows[0], { ts: '第 2 列', id: 'C002', reply: '到場', reasons: '', note: '' });
 });
 
 test('匯入的範例檔：UTF-8 和 Big5 內容相同', () => {
@@ -235,4 +235,34 @@ test('rowsFromTable：認得表單的「附件」上傳題', () => {
   assert.equal(t.columns.files, 5);
   assert.equal(t.columns.note, 4, '「說明」仍是說明欄');
   assert.equal(t.rows[0].files, 'https://drive.google.com/open?id=x');
+});
+
+test('附件：有上傳欄時以實際上傳為準（說明寫了附、卻沒上傳＝沒附）', () => {
+  // 截圖案例 C369：AI 判可能符合、只差核對身分證，但表單沒有上傳檔案
+  const ai = { '對應事由': '國民法官法第16條第1款', '類型': '得拒絕', 'AI建議': '可能符合', '需人工確認': '否', '理由': '年滿七十', '承辦待辦': '核對附件（身分證）後送法院', src: 'ai' };
+  const app = { id: 'C369', reasons: '年滿 70 歲以上', note: '年邁，身體不好去不了(附身分證)', files: '' };
+  const c = S.finalize(ai, app);
+  assert.equal(c['需人工確認'], '是');
+  assert.match(c['承辦待辦'], /^沒有上傳附件（說明寫附「身分證」），請補身分證明/);
+  const n = S.noticeFor(c, app);
+  assert.ok(n, '要發補件通知');
+  assert.match(n.text, /表單沒有收到上傳的檔案/);
+  // 有上傳：照常核對
+  const up = S.finalize(ai, Object.assign({}, app, { files: 'https://drive.google.com/open?id=x' }));
+  assert.equal(up['需人工確認'], '否');
+  // 沒有上傳欄（示範資料、舊表單）：維持只看說明
+  assert.equal(S.finalize(ai, { id: 'C369', reasons: app.reasons, note: app.note })['需人工確認'], '否');
+});
+
+test('附件：有上傳、說明沒寫附了什麼 → 規則改成核對上傳的檔案，不發補件', () => {
+  const app = { id: 'C400', reasons: '年滿 70 歲以上', note: '我今年 72 歲。', files: 'https://drive.google.com/open?id=y' };
+  const c = S.finalize(S.ruleClassify(app, OPTS), app);
+  assert.equal(c['需人工確認'], '否');
+  assert.match(c['承辦待辦'], /^核對上傳的附件（身分證明.*後送法院$/);
+  assert.equal(S.noticeFor(c, app), null);
+});
+
+test('rowsFromTable：沒有上傳欄就不帶 files；有上傳欄、空白就是沒上傳', () => {
+  assert.equal('files' in S.rowsFromTable([['候選人編號', '你的回覆'], ['C1', '到場']]).rows[0], false);
+  assert.equal(S.rowsFromTable([['候選人編號', '你的回覆', '附件'], ['C1', '到場', '']]).rows[0].files, '');
 });
